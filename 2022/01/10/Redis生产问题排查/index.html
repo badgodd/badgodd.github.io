@@ -20,30 +20,47 @@
     var CONFIG = {"hostname":"example.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
-  <meta name="description" content="无问东西">
-<meta property="og:type" content="website">
-<meta property="og:title" content="Bad Godd&#39;s Blog">
-<meta property="og:url" content="http://example.com/index.html">
+  <meta name="description" content="JDBC-SPI打破背景为了更加灵活的连接数据库，我们的JDK定义了Driver接口，需要与数据库进行连接的包必须实现该接口。例如：MySQL，建议去观察下项目中mysql-connector包，下面就有实现类的全限定类名。    打破原因在上述背景下，执行 DriverManager类的方法时，需要去加载实现类。还记得我们第一篇文章讲的 BootStrapClassLoader吗，它只能加载rt">
+<meta property="og:type" content="article">
+<meta property="og:title" content="双亲委派企业级应用">
+<meta property="og:url" content="http://example.com/2022/01/10/Redis%E7%94%9F%E4%BA%A7%E9%97%AE%E9%A2%98%E6%8E%92%E6%9F%A5/index.html">
 <meta property="og:site_name" content="Bad Godd&#39;s Blog">
-<meta property="og:description" content="无问东西">
+<meta property="og:description" content="JDBC-SPI打破背景为了更加灵活的连接数据库，我们的JDK定义了Driver接口，需要与数据库进行连接的包必须实现该接口。例如：MySQL，建议去观察下项目中mysql-connector包，下面就有实现类的全限定类名。    打破原因在上述背景下，执行 DriverManager类的方法时，需要去加载实现类。还记得我们第一篇文章讲的 BootStrapClassLoader吗，它只能加载rt">
 <meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="c:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20231011142644308.png">
+<meta property="og:image" content="c:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20231011142230230.png">
+<meta property="og:image" content="c:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20231011142323580.png">
+<meta property="og:image" content="c:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20231011142340932.png">
+<meta property="og:image" content="c:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20231011142704289.png">
+<meta property="og:image" content="https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/7eef22460ea542949c8959b62ebcfb2f~tplv-k3u1fbpfcp-zoom-in-crop-mark:1512:0:0:0.awebp?!%5Bimage-20231010110449075%5D(C:%5CUsers%5CAdministrator%5CAppData%5CRoaming%5CTypora%5Ctypora-user-images%5Cimage-20231010110449075.png">
+<meta property="og:image" content="https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/022f8a08cb5a4b6e8ef3c9d55b112899~tplv-k3u1fbpfcp-zoom-in-crop-mark:1512:0:0:0.awebp">
+<meta property="og:image" content="https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/55b89135128e4a4d84ee04ed1200ac5d~tplv-k3u1fbpfcp-zoom-in-crop-mark:1512:0:0:0.awebp">
+<meta property="og:image" content="https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/5d2030844b4f458cb603b29dbab866cf~tplv-k3u1fbpfcp-zoom-in-crop-mark:1512:0:0:0.awebp">
+<meta property="og:image" content="https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/0d44b48ad82e4742b58ba7a21ea2fc56~tplv-k3u1fbpfcp-zoom-in-crop-mark:1512:0:0:0.awebp">
+<meta property="og:image" content="https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/d4df9e5e811c4c089236a1d2d5069276~tplv-k3u1fbpfcp-zoom-in-crop-mark:1512:0:0:0.awebp">
+<meta property="og:image" content="https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/6294097f30f141429a2b154a87c5e075~tplv-k3u1fbpfcp-zoom-in-crop-mark:1512:0:0:0.awebp">
+<meta property="og:image" content="c:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20231011142937570.png">
+<meta property="article:published_time" content="2022-01-10T13:29:44.000Z">
+<meta property="article:modified_time" content="2023-10-11T06:30:29.290Z">
 <meta property="article:author" content="bad godd">
+<meta property="article:tag" content="JVM">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="c:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20231011142644308.png">
 
-<link rel="canonical" href="http://example.com/">
+<link rel="canonical" href="http://example.com/2022/01/10/Redis%E7%94%9F%E4%BA%A7%E9%97%AE%E9%A2%98%E6%8E%92%E6%9F%A5/">
 
 
 <script id="page-configurations">
   // https://hexo.io/docs/variables.html
   CONFIG.page = {
     sidebar: "",
-    isHome : true,
-    isPost : false,
+    isHome : false,
+    isPost : true,
     lang   : 'zh-CN'
   };
 </script>
 
-  <title>Bad Godd's Blog</title>
+  <title>双亲委派企业级应用 | Bad Godd's Blog</title>
   
 
 
@@ -185,9 +202,10 @@
         <div class="content-wrap">
           
 
-          <div class="content index posts-expand">
+          <div class="content post posts-expand">
             
-      
+
+    
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
@@ -203,10 +221,9 @@
       <meta itemprop="name" content="Bad Godd's Blog">
     </span>
       <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/01/10/Redis%E7%94%9F%E4%BA%A7%E9%97%AE%E9%A2%98%E6%8E%92%E6%9F%A5/" class="post-title-link" itemprop="url">双亲委派企业级应用</a>
-        </h2>
+        <h1 class="post-title" itemprop="name headline">
+          双亲委派企业级应用
+        </h1>
 
         <div class="post-meta">
             <span class="post-meta-item">
@@ -252,7 +269,7 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <h1 id="JDBC-SPI"><a href="#JDBC-SPI" class="headerlink" title="JDBC-SPI"></a>JDBC-SPI</h1><h2 id="打破背景"><a href="#打破背景" class="headerlink" title="打破背景"></a>打破背景</h2><p>为了更加灵活的连接数据库，我们的JDK定义了<code>Driver</code>接口，需要与数据库进行连接的包必须实现该接口。例如：MySQL，建议去观察下项目中<code>mysql-connector</code>包，下面就有实现类的全限定类名。  </p>
+        <h1 id="JDBC-SPI"><a href="#JDBC-SPI" class="headerlink" title="JDBC-SPI"></a>JDBC-SPI</h1><h2 id="打破背景"><a href="#打破背景" class="headerlink" title="打破背景"></a>打破背景</h2><p>为了更加灵活的连接数据库，我们的JDK定义了<code>Driver</code>接口，需要与数据库进行连接的包必须实现该接口。例如：MySQL，建议去观察下项目中<code>mysql-connector</code>包，下面就有实现类的全限定类名。  </p>
 <p><img src="C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20231011142644308.png" alt="image-20231011142644308"></p>
 <h2 id="打破原因"><a href="#打破原因" class="headerlink" title="打破原因"></a>打破原因</h2><p>在上述背景下，执行 <code>DriverManager</code>类的方法时，需要去加载实现类。还记得我们第一篇文章讲的 <code>BootStrapClassLoader</code>吗，它只能加载<code>rt.jar</code>下的类。而MySQL的加载路径隶属于<code>AppClassLoader</code>,所以理论上它压根就不能被加载。</p>
 <p>于是线程上下文类加载器就应运而生，由于<code>ThreadClassLoader</code>一般情况下&#x3D;&#x3D;<code>AppClassLoader</code>。于是通过线程上下文类加载器加载JDBC实现类，打破了双亲委派模型，顺利实现功能。</p>
@@ -307,21 +324,43 @@
 </li>
 </ol>
 
-      
     </div>
 
     
     
     
+        
+
+<div>
+<ul class="post-copyright">
+  <li class="post-copyright-author">
+    <strong>本文作者： </strong>bad godd
+  </li>
+  <li class="post-copyright-link">
+    <strong>本文链接：</strong>
+    <a href="http://example.com/2022/01/10/Redis%E7%94%9F%E4%BA%A7%E9%97%AE%E9%A2%98%E6%8E%92%E6%9F%A5/" title="双亲委派企业级应用">http://example.com/2022/01/10/Redis生产问题排查/</a>
+  </li>
+  <li class="post-copyright-license">
+    <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/zh-CN" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+
       <footer class="post-footer">
-        <div class="post-eof"></div>
+          <div class="post-tags">
+              <a href="/tags/JVM/" rel="tag"># JVM</a>
+          </div>
+
+        
+
+
+        
       </footer>
+    
   </article>
   
   
-  
-
-
   
 
 
@@ -374,6 +413,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#JDBC-SPI"><span class="nav-number">1.</span> <span class="nav-text">JDBC-SPI</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%89%93%E7%A0%B4%E8%83%8C%E6%99%AF"><span class="nav-number">1.1.</span> <span class="nav-text">打破背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%89%93%E7%A0%B4%E5%8E%9F%E5%9B%A0"><span class="nav-number">1.2.</span> <span class="nav-text">打破原因</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%BA%90%E7%A0%81%E8%A7%A3%E8%AF%BB"><span class="nav-number">1.3.</span> <span class="nav-text">源码解读</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%8D%E8%B6%B3"><span class="nav-number">1.4.</span> <span class="nav-text">不足</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Tomcat"><span class="nav-number">2.</span> <span class="nav-text">Tomcat</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%89%93%E7%A0%B4%E8%83%8C%E6%99%AF-1"><span class="nav-number">2.1.</span> <span class="nav-text">打破背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%89%93%E7%A0%B4%E5%8E%9F%E5%9B%A0-1"><span class="nav-number">2.2.</span> <span class="nav-text">打破原因</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9E%E7%8E%B0%E6%96%B9%E5%BC%8F"><span class="nav-number">2.3.</span> <span class="nav-text">实现方式</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#SpringBoot"><span class="nav-number">3.</span> <span class="nav-text">SpringBoot</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%89%93%E7%A0%B4%E8%83%8C%E6%99%AF-2"><span class="nav-number">3.1.</span> <span class="nav-text">打破背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%89%93%E7%A0%B4%E5%8E%9F%E5%9B%A0-2"><span class="nav-number">3.2.</span> <span class="nav-text">打破原因</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9F%A5%E7%9C%8B%E6%BA%90%E7%A0%81%E6%96%B9%E6%B3%95"><span class="nav-number">3.3.</span> <span class="nav-text">查看源码方法</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9E%E7%8E%B0%E6%96%B9%E5%BC%8F-1"><span class="nav-number">3.4.</span> <span class="nav-text">实现方式</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%83%AD%E5%8A%A0%E8%BD%BD"><span class="nav-number">4.</span> <span class="nav-text">热加载</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%89%93%E7%A0%B4%E8%83%8C%E6%99%AF-3"><span class="nav-number">4.1.</span> <span class="nav-text">打破背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%89%93%E7%A0%B4%E5%8E%9F%E5%9B%A0-3"><span class="nav-number">4.2.</span> <span class="nav-text">打破原因</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9E%E7%8E%B0%E6%96%B9%E5%BC%8F-2"><span class="nav-number">4.3.</span> <span class="nav-text">实现方式</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Jar%E5%8C%85%E5%86%B2%E7%AA%81"><span class="nav-number">5.</span> <span class="nav-text">Jar包冲突</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%89%93%E7%A0%B4%E8%83%8C%E6%99%AF-4"><span class="nav-number">5.1.</span> <span class="nav-text">打破背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%89%93%E7%A0%B4%E5%8E%9F%E5%9B%A0-4"><span class="nav-number">5.2.</span> <span class="nav-text">打破原因</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9E%E7%8E%B0%E6%96%B9%E5%BC%8F-3"><span class="nav-number">5.3.</span> <span class="nav-text">实现方式</span></a></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
