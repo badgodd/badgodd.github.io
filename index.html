@@ -191,6 +191,125 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2023/06/11/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98FullGC/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/touxiang.jpg">
+      <meta itemprop="name" content="bad godd">
+      <meta itemprop="description" content="无问东西">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Bad Godd's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2023/06/11/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98FullGC/" class="post-title-link" itemprop="url">线上问题FullGC</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2023-06-11 21:18:09" itemprop="dateCreated datePublished" datetime="2023-06-11T21:18:09+08:00">2023-06-11</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E7%BA%BF%E4%B8%8A/" itemprop="url" rel="index"><span itemprop="name">线上</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>2.4k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>2 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="背景知识-background"><a href="#背景知识-background" class="headerlink" title="背景知识 (background)"></a>背景知识 (background)</h2><p>FullGC通常伴随着比较久的停顿和性能退化，不过不同GC算法关注点不一样。</p>
+<p>对CMS来说，FullGC是比较正常的，每次STW也比较短，但频繁的话会导致吞吐量下降，因此重点考察CMS FullGC的频率，目前1分钟超过12次就报警。</p>
+<p>CMS分两种模式：Background和Foreground，严格来说，Foreground才算FullGC。Foreground在Promotion Failed、Concurrent Mode Failure等条件下触发，是单线程串行回收的，对整个老年代进行清理、压缩，消除内存碎片，STW 时间长，有时会长达十几秒。Background是正常情况下触发的并发回收的 CMS GC，停顿非常短，对业务影响很小。</p>
+<p>对G1来说，FullGC对整个堆(Young+Old Generation)进行清理，通常意味着更大的停顿时长，是我们要竭力避免的，因此出现一次就报警。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">FullGC报警是针对老年代的GC频率，我们有单独的GC耗时报警用于捕捉停顿较久的场景。</span><br></pre></td></tr></table></figure>
+
+<h3 id="查看指标-dashboard"><a href="#查看指标-dashboard" class="headerlink" title="查看指标 (dashboard)"></a>查看指标 (dashboard)</h3><p>展开: JVM &#x2F; 内存 &#x2F; GC &#x2F; <a target="_blank" rel="noopener" href="https://so.csdn.net/so/search?q=ClassLoader&spm=1001.2101.3001.7020">ClassLoader</a>这一行，找到监控面板：GC耗时和 GC原因与频次。</p>
+<p><img src="/2023/06/11/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98FullGC/image-20231011192636268.png" alt="image-20231011192636268"></p>
+<h3 id="止损措施-action"><a href="#止损措施-action" class="headerlink" title="止损措施 (action)"></a>止损措施 (action)</h3><p>FullGC发生时，已产生负面影响。如果集中在单个节点，可考虑摘流或者调小节点权重。</p>
+<p>建议关注Old区的增长，在下次FullGC前，<code>先手动摘流，然后Dump堆内存</code>。</p>
+<h3 id="事后改进-postmortem"><a href="#事后改进-postmortem" class="headerlink" title="事后改进(postmortem)"></a>事后改进(postmortem)</h3><p>FullGC通常是老年代内存不足，放不下新晋升的对象。</p>
+<p>大概率是代码的内存开销太大，比如全量或大批量加载数据、导入导出&#x2F;上传下载等。</p>
+<p>可通过慢接口、慢查询、AccessLog 、 应用日志等初步筛选可疑接口，优化逻辑，确保单次执行的资源开销是稳定的、高效的。</p>
+<p>除此之外，请参考原因(cause)部分，针对当前业务调优GC参数，建议每次只调整一个变量，灰度观察。</p>
+<p>GC优化后，通过所选时段内累计GC耗时计算GC耗时在所选时段内的占比是否下降，所选时段内累计GC次数查看所选时段内各类型GC的次数是否有变化。优先GC耗时下降，GC频率仅做参考。</p>
+<h2 id="可能的原因-cause"><a href="#可能的原因-cause" class="headerlink" title="可能的原因 (cause)"></a>可能的原因 (cause)</h2><p>Old区通常是是生命周期比较久的对象，比如本地缓存、各种连接池的连接、监控指标、全局对象等。</p>
+<p>处理这种问题，可在Old区GC前后分别Dump内存(先摘流)，借助MAT进行内存&#x2F;对象Diff，按照对象、类、类加载器、包等多个维度观察 Histogram，分析 Unreachable。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Unreachable是可回收的对象，可用于判断某些对象是否生成过多。</span><br></pre></td></tr></table></figure>
+
+<h4 id="一、过早晋升-Premature-Promotion"><a href="#一、过早晋升-Premature-Promotion" class="headerlink" title="一、过早晋升(Premature Promotion)"></a>一、过早晋升(Premature Promotion)</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">过早晋升通常以CMS+Parnew组合居多，G1的话，建议勿指定新生代大小(-Xmn)。</span><br></pre></td></tr></table></figure>
+
+<p>临时对象经过几次 Young GC后才会晋升到 Old 区，每复制到survivor区一次， GC Age 就会增长 1，最大Age通过 -XX:MaxTenuringThreshold 来控制。</p>
+<p>过早晋升一般不会直接影响 GC，常伴随着浮动垃圾、大对象担保失败等问题，我们通过以下方式交叉验证：</p>
+<p>JVM内存池里的指标Old Gen(heap)经过一次GC回收后，内存占用下降了很多，可比较 max &#x2F; min，比如，max 值为 2.5G ，GC后只剩下了 500 M，那说明，只有500MB活跃对象，其余的都被回收了。<br>GC 内存分配里新生代每秒增加的字节(申请的内存)过大，同时有很多对象晋升到了老年代(每秒新增字节)。老年代晋升的越多，就可能有过早晋升的问题。<br>查看节点的GC日志，查看对象晋升的threshold，类似new threshold 1(max 6)，说明只回收了一次就晋升了。<br>过早晋升，会增加Old区的内存占用，触发频繁的Full GC，降低吞吐量。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Old区占用超过某个阈值(+XX:CMSInitiatingOccupancyFraction/+XX:InitiatingHeapOccupancyPercent)时，CMS会触发 Background GC，G1会触发mixed gc。</span><br></pre></td></tr></table></figure>
+
+<p>常见原因是新生代(Young&#x2F;Eden区)过小，Young区被快速填满，本该回收的对象参与了 GC并晋升。另外，无法及时回收的对象还会影响-XX:MaxTenuringThreshold的动态计算，导致 threshold 变小 ，更多的临时对象进入了 Old 区，造成资源浪费。</p>
+<p>JVM内存池里的指标Eden Gen(heap)的max即 Young区的最大值，可适当调大观察效果。</p>
+<p>若在总的Heap内存不变的情况下调大Young区，可适当调小Old区，但考虑到浮动垃圾，建议Old区大小为一轮回收后Old区活跃对象的3倍左右。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">注意，调大Young区对ParNew来说每次GC Copy的对象更多了，虽然会降低GC次数，但可能增加单次GC耗时，可参考所选时段总耗时来决定优化是否有效。</span><br></pre></td></tr></table></figure>
+
+<p>除了Young区小之外，也可能是内存分配压力大，可通过<code>JVM / 内存 / GC / ClassLoader</code>里的GC内存分配面板来验证。</p>
+<p><img src="/2023/06/11/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98FullGC/image-20231011192908088.png" alt="image-20231011192908088"></p>
+<p>内存分配速率，如果是偶发的毛刺、突增，通常是业务代码加载了大批数据，可配合MAT等工具分析内存、优化代码；如果持续比较大，那说明内存不够用了，只能申请套餐扩容或者尝试G1。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">开发可筛选时间段内的慢请求、AccessLog、应用日志，缩小排查范围；尽可能保证接口内存开销的稳定性，避免浪费资源。</span><br></pre></td></tr></table></figure>
+
+<p>内存分配速率越大，GC越频繁，两次 Young GC 的间隔时间尽量大于接口P99.9的时间，这样尽量让对象在 Young 区就被回收，可以减少很多停顿。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">慢请求不只是对线程池/资源池的挤占，在多次GC期间不能被回收的垃圾就转移到Old区了。</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -327,6 +446,198 @@
   
   
 
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2022/01/03/git%E4%BD%BF%E7%94%A8%E4%B8%AD-error-pathspec-%E2%80%98xxx%E2%80%98-did-not-match-any-file-s-known-to-git-%E6%8A%A5%E9%94%99%E8%A7%A3%E5%86%B3%E6%96%B9%E6%B3%95/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/touxiang.jpg">
+      <meta itemprop="name" content="bad godd">
+      <meta itemprop="description" content="无问东西">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Bad Godd's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/01/03/git%E4%BD%BF%E7%94%A8%E4%B8%AD-error-pathspec-%E2%80%98xxx%E2%80%98-did-not-match-any-file-s-known-to-git-%E6%8A%A5%E9%94%99%E8%A7%A3%E5%86%B3%E6%96%B9%E6%B3%95/" class="post-title-link" itemprop="url">git使用中 error: pathspec ‘xxx‘ did not match any file(s) known to git 报错解决方法</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-01-03 20:11:04" itemprop="dateCreated datePublished" datetime="2022-01-03T20:11:04+08:00">2022-01-03</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Git/" itemprop="url" rel="index"><span itemprop="name">Git</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>1.2k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>1 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="一、问题描述"><a href="#一、问题描述" class="headerlink" title="一、问题描述"></a>一、问题描述</h2><p>项目上想合并学弟的代码，以自己的分支master作为主分支，要合并学弟的分支study，结果<br>在 git merge study 的时候报如下错误<br>其实在 git checkout 的时候也会出现这个错误</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">error: pathspec &#x27;origin/XXX&#x27; did not match any file(s) known to git.</span><br><span class="line">发现是本地git没有识别到远程git仓库的分支</span><br></pre></td></tr></table></figure>
+
+<h2 id="二、解决办法"><a href="#二、解决办法" class="headerlink" title="二、解决办法"></a>二、解决办法</h2><p>1、首先看下所有分支 是否有学弟的新分支</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git branch -a</span><br></pre></td></tr></table></figure>
+
+<p>2、如果没看到，那么执行以下操作，这步是获取所有分支</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git fetch</span><br></pre></td></tr></table></figure>
+
+
+<p>执行完会看到这样提示</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">remote: Enumerating objects: 4, done.</span><br><span class="line">remote: Counting objects: 100% (4/4), done.</span><br><span class="line">Unpacking objects: 100% (4/4), 1.06 KiB | 90.00 KiB/s, done.</span><br><span class="line">From codeup.aliyun.com:5eeb0689892c58bb7c394ab5/pxb/pxb-fronted</span><br><span class="line"> * [new branch]      XXX -&gt; origin/XXX</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+
+
+<p>3、切换到远程学弟分支:</p>
+<p>git checkout origin&#x2F;xxx</p>
+<p>提示：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">Note: switching to &#x27;origin/xxx&#x27;.</span><br><span class="line"></span><br><span class="line">You are in &#x27;detached HEAD&#x27; state. You can look around, make experimental</span><br><span class="line">changes and commit them, and you can discard any commits you make in this</span><br><span class="line">state without impacting any branches by switching back to a branch.</span><br><span class="line"></span><br><span class="line">If you want to create a new branch to retain commits you create, you may</span><br><span class="line">do so (now or later) by using -c with the switch command. Example:</span><br><span class="line"></span><br><span class="line">  git switch -c &lt;new-branch-name&gt;</span><br><span class="line"></span><br><span class="line">Or undo this operation with:</span><br><span class="line"></span><br><span class="line">  git switch -</span><br><span class="line"></span><br><span class="line">Turn off this advice by setting config variable advice.detachedHead to false</span><br><span class="line"></span><br><span class="line">HEAD is now at dc877cd XXX</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>4、现在可以看到自己的分支是一串数字字母，这时新建并切换到学弟的分支</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git checkout -b xxx</span><br></pre></td></tr></table></figure>
+
+<p>5、现在需要跟远程的学弟分支进行关联</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git branch -u origin/xxx</span><br></pre></td></tr></table></figure>
+
+<p>6、这时我们执行git pull来看看什么反馈:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Already up-to-date.</span><br></pre></td></tr></table></figure>
+
+<p>大功告成~</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2022/01/02/%E8%A7%A3%E5%86%B3hexo-Typora-%E5%9B%BE%E7%89%87%E4%B8%8A%E4%BC%A0%E9%97%AE%E9%A2%98/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/touxiang.jpg">
+      <meta itemprop="name" content="bad godd">
+      <meta itemprop="description" content="无问东西">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Bad Godd's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/01/02/%E8%A7%A3%E5%86%B3hexo-Typora-%E5%9B%BE%E7%89%87%E4%B8%8A%E4%BC%A0%E9%97%AE%E9%A2%98/" class="post-title-link" itemprop="url">解决hexo + Typora 图片上传问题</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-01-02 19:05:39" itemprop="dateCreated datePublished" datetime="2022-01-02T19:05:39+08:00">2022-01-02</time>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>468</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>1 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>本文解决hexo + <a target="_blank" rel="noopener" href="https://so.csdn.net/so/search?q=Typora&spm=1001.2101.3001.7020">Typora</a>图片上传不显示的问题</p>
+<p>按如下步骤修改设定Typora中图片放置的位置</p>
+<p>这样当自己新建一个文章后，如果添加图片，会在文章所在目录下生成一个与文章同名的文件夹，并将图片存入该文件夹中，此后该文章中所有添加的图片均存入该文件夹中。</p>
+<p><img src="/2022/01/02/%E8%A7%A3%E5%86%B3hexo-Typora-%E5%9B%BE%E7%89%87%E4%B8%8A%E4%BC%A0%E9%97%AE%E9%A2%98/image-20231011190708925.png" alt="image-20231011190708925"></p>
+<p>修改博客根目录下的_config.yml文件中的post_asset_folder字段设置为true</p>
+<p>当设置 post_asset_folder 参数后，在hexo n命令建立文件时， 会自动建立一个与文章同名的文件夹，把与该文章相关的所有图片资源都放到此文件夹内，这样就可以方便的使用图片资源</p>
+<p>同时，只有当post_asset_folder设置为true后，后续安装的插件才会起作用</p>
+<p><img src="/2022/01/02/%E8%A7%A3%E5%86%B3hexo-Typora-%E5%9B%BE%E7%89%87%E4%B8%8A%E4%BC%A0%E9%97%AE%E9%A2%98/image-20231011190829534.png" alt="image-20231011190829534"></p>
+<p>安装插件</p>
+<p>到博客的根目录下执行 npm install <a target="_blank" rel="noopener" href="https://github.com/CodeFalling/hexo-asset-image">https://github.com/CodeFalling/hexo-asset-image</a> –save 命令来进行插件的安装</p>
+<p>当文章全部写完后，使用Typora的替换功能（替换功能包含删除功能，当替换的内容什么都不输入时为全部删除）将所有图片地址前面多余的部分删除即可</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
 
   
 
@@ -395,20 +706,20 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">1</span>
+          <span class="site-state-item-count">4</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">1</span>
+        <span class="site-state-item-count">3</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">1</span>
+        <span class="site-state-item-count">3</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
