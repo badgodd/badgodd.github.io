@@ -1,25 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>test</title>
+    <url>/2023/10/11/test/</url>
+    <content><![CDATA[<p>测试图片</p>
+<p><img src="/2023/10/11/test/RocketMq%E6%B6%88%E8%B4%B9%E8%80%85.png" alt="RocketMq消费者"></p>
+]]></content>
+  </entry>
+  <entry>
     <title>双亲委派企业级应用</title>
     <url>/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/</url>
     <content><![CDATA[<h1 id="JDBC-SPI"><a href="#JDBC-SPI" class="headerlink" title="JDBC-SPI"></a>JDBC-SPI</h1><h2 id="打破背景"><a href="#打破背景" class="headerlink" title="打破背景"></a>打破背景</h2><p>为了更加灵活的连接数据库，我们的JDK定义了<code>Driver</code>接口，需要与数据库进行连接的包必须实现该接口。例如：MySQL，建议去观察下项目中<code>mysql-connector</code>包，下面就有实现类的全限定类名。  </p>
-<p><img src="/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011142644308-1697011108741.png" alt="image-20231011142644308"></p>
+<p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011142644308-1697011108741.png" alt="image-20231011142644308"></p>
 <h2 id="打破原因"><a href="#打破原因" class="headerlink" title="打破原因"></a>打破原因</h2><p>在上述背景下，执行 <code>DriverManager</code>类的方法时，需要去加载实现类。还记得我们第一篇文章讲的 <code>BootStrapClassLoader</code>吗，它只能加载<code>rt.jar</code>下的类。而MySQL的加载路径隶属于<code>AppClassLoader</code>,所以理论上它压根就不能被加载。</p>
 <p>于是线程上下文类加载器就应运而生，由于<code>ThreadClassLoader</code>一般情况下&#x3D;&#x3D;<code>AppClassLoader</code>。于是通过线程上下文类加载器加载JDBC实现类，打破了双亲委派模型，顺利实现功能。</p>
 <h2 id="源码解读"><a href="#源码解读" class="headerlink" title="源码解读"></a>源码解读</h2><ol>
 <li><p>查看DriverManager类 </p>
-<p><img src="/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011142230230-1697011108742.png" alt="image-20231011142230230"></p>
+<p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011142230230-1697011108742.png" alt="image-20231011142230230"></p>
 </li>
 <li><p>获取线程上下文加载器，一般是AppClassLoder，并且Set到ServiceLoader中 </p>
 </li>
-<li><p>通过迭代器迭代<img src="/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011142323580-1697011108742.png" alt="image-20231011142323580"></p>
+<li><p>通过迭代器迭代<img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011142323580-1697011108742.png" alt="image-20231011142323580"></p>
 </li>
 <li><p>获取实现类路径配置 &#x3D; “META-INF&#x2F;services&#x2F;“ + service.name; </p>
-<p><img src="/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011142340932-1697011108742.png" alt="image-20231011142340932"></p>
+<p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011142340932-1697011108742.png" alt="image-20231011142340932"></p>
 </li>
 <li><p>加载实现类 </p>
-<p><img src="/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011142704289-1697011108742.png" alt="image-20231011142704289"></p>
+<p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011142704289-1697011108742.png" alt="image-20231011142704289"></p>
 </li>
 </ol>
 <h2 id="不足"><a href="#不足" class="headerlink" title="不足"></a>不足</h2><p>ServiceLoader只提供了遍历的方式来获取目标实现类，假如有多个JDBC实现类，都会去加载，没有提供按需加载的方法。像<code>Dubbo SPI</code>就提供了可配置化的加载.</p>
@@ -29,7 +36,7 @@
 <li>部署在同一个Tomcat容器中相同的类库相同的版本可以共享。否则，如果服务器有10个应用程序，那么要有10份相同的类库加载进虚拟机。</li>
 <li>web容器也有自己依赖的类库，不能于应用程序的类库混淆。基于安全考虑，应该让容器的类库和程序的类库隔离开来。 总结：有些共用类只需要一份，有些类只需要多份隔离。</li>
 </ol>
-<h2 id="实现方式"><a href="#实现方式" class="headerlink" title="实现方式"></a>实现方式</h2><p><img src="https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/7eef22460ea542949c8959b62ebcfb2f~tplv-k3u1fbpfcp-zoom-in-crop-mark:1512:0:0:0.awebp?!%5Bimage-20231010110449075%5D(%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231010110449075-1697009246437-1697011108742.png" alt="image.png"></p>
+<h2 id="实现方式"><a href="#实现方式" class="headerlink" title="实现方式"></a>实现方式</h2><p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231010110449075-1697009246437-1697011108742.png" alt="image-20231010110449075"></p>
 <ol>
 <li>Webapp 应用类加载器每个应用在部署后，都会创建一个唯一的类加载器。该类加载器会加载位于 WEB-INF&#x2F;lib下的jar文件中的class 和 WEB-INF&#x2F;classes下的class文件。</li>
 <li>通过<code>Common ClassLoader</code>加载通用的类。</li>
@@ -41,26 +48,27 @@
 <h2 id="实现方式-1"><a href="#实现方式-1" class="headerlink" title="实现方式"></a>实现方式</h2><ol>
 <li><p>当<code>java -jar xxx</code>时，会去调用<code>JarLauncher.launch()</code>方法。</p>
 </li>
-<li><p>获取需要加载的类和包并作为参数传递到LauncherURLClassLoader <img src="https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/022f8a08cb5a4b6e8ef3c9d55b112899~tplv-k3u1fbpfcp-zoom-in-crop-mark:1512:0:0:0.awebp" alt="image.png"></p>
+<li><p>获取需要加载的类和包并作为参数传递到LauncherURLClassLoader </p>
 </li>
 <li><p>创建类加载器 </p>
 </li>
 <li><p>获取启动类, 可以看到在我们的项目中Start-Class &#x3D; “Application.class” </p>
-<p><img src="/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011153254352-1697011108742.png" alt="image-20231011153254352"> </p>
+<p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011153254352-1697011108742.png" alt="image-20231011153254352"> </p>
 </li>
 <li><p>通过自定义加载器加载类，并且反射调用 <code>Start-Class</code>的<code>main</code>方法启动项目。 </p>
-<p><img src="/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011153237491-1697011108742.png" alt="image-20231011153237491"></p>
+<p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011153237491-1697011108742.png" alt="image-20231011153237491"></p>
 </li>
 </ol>
 <h1 id="热加载"><a href="#热加载" class="headerlink" title="热加载"></a>热加载</h1><h2 id="打破背景-3"><a href="#打破背景-3" class="headerlink" title="打破背景"></a>打破背景</h2><p>早期的项目，如果修改了代码之后，需要重启项目才能使代码正确运行。</p>
 <h2 id="打破原因-3"><a href="#打破原因-3" class="headerlink" title="打破原因"></a>打破原因</h2><p>为了让代码修改后能够快速响应，需要通过热加载的形式，动态发现修改的类，并且使用自定义类加载器快速加载变化的类。</p>
-<h2 id="实现方式-2"><a href="#实现方式-2" class="headerlink" title="实现方式"></a>实现方式</h2><p><img src="https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/6294097f30f141429a2b154a87c5e075~tplv-k3u1fbpfcp-zoom-in-crop-mark:1512:0:0:0.awebp" alt="image.png"></p>
+<h2 id="实现方式-2"><a href="#实现方式-2" class="headerlink" title="实现方式"></a>实现方式</h2><p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011162414744.png" alt="image-20231011162414744"></p>
 <h1 id="Jar包冲突"><a href="#Jar包冲突" class="headerlink" title="Jar包冲突"></a>Jar包冲突</h1><h2 id="打破背景-4"><a href="#打破背景-4" class="headerlink" title="打破背景"></a>打破背景</h2><p>项目中经常出现jar包冲突导致抛出异常，不是NoSuchMethod,NoClassDefund。</p>
 <h2 id="打破原因-4"><a href="#打破原因-4" class="headerlink" title="打破原因"></a>打破原因</h2><p>Jar包冲突的原因是使用了C2类的方法, 但JVM却加载了C1类。可以让相同包名的包由不同的类加载器加载，进行隔离，避免jar包冲突。</p>
 <h2 id="实现方式-3"><a href="#实现方式-3" class="headerlink" title="实现方式"></a>实现方式</h2><ol>
 <li><p>通过自定义类加载器，为每个中间件自定义一个加载器，这些加载器之间的关系是平行的，彼此没有依赖关系。</p>
 </li>
 <li><p>这样每个中间件的classloader就可以加载各自版本的包。因为一个类的全限定名以及加载该类的加载器两者共同形成了这个类在JVM中的惟一标识。</p>
+<p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/goujiatu-scaled.jpg" alt="goujiatu-scaled"></p>
 </li>
 </ol>
 ]]></content>
