@@ -4,22 +4,22 @@
     <title>双亲委派企业级应用</title>
     <url>/2022/01/10/Redis%E7%94%9F%E4%BA%A7%E9%97%AE%E9%A2%98%E6%8E%92%E6%9F%A5/</url>
     <content><![CDATA[<h1 id="JDBC-SPI"><a href="#JDBC-SPI" class="headerlink" title="JDBC-SPI"></a>JDBC-SPI</h1><h2 id="打破背景"><a href="#打破背景" class="headerlink" title="打破背景"></a>打破背景</h2><p>为了更加灵活的连接数据库，我们的JDK定义了<code>Driver</code>接口，需要与数据库进行连接的包必须实现该接口。例如：MySQL，建议去观察下项目中<code>mysql-connector</code>包，下面就有实现类的全限定类名。  </p>
-<p><img src="C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20231011142644308.png" alt="image-20231011142644308"></p>
+<p><img src="D:\MyProject\MyBlog\source\images\20220110\image-20231011142644308.png" alt="image-20231011142644308"></p>
 <h2 id="打破原因"><a href="#打破原因" class="headerlink" title="打破原因"></a>打破原因</h2><p>在上述背景下，执行 <code>DriverManager</code>类的方法时，需要去加载实现类。还记得我们第一篇文章讲的 <code>BootStrapClassLoader</code>吗，它只能加载<code>rt.jar</code>下的类。而MySQL的加载路径隶属于<code>AppClassLoader</code>,所以理论上它压根就不能被加载。</p>
 <p>于是线程上下文类加载器就应运而生，由于<code>ThreadClassLoader</code>一般情况下&#x3D;&#x3D;<code>AppClassLoader</code>。于是通过线程上下文类加载器加载JDBC实现类，打破了双亲委派模型，顺利实现功能。</p>
 <h2 id="源码解读"><a href="#源码解读" class="headerlink" title="源码解读"></a>源码解读</h2><ol>
 <li><p>查看DriverManager类 </p>
-<p><img src="C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20231011142230230.png" alt="image-20231011142230230"></p>
+<p><img src="D:\MyProject\MyBlog\source\images\20220110\image-20231011142230230.png" alt="image-20231011142230230"></p>
 </li>
 <li><p>获取线程上下文加载器，一般是AppClassLoder，并且Set到ServiceLoader中 </p>
 </li>
-<li><p>通过迭代器迭代<img src="C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20231011142323580.png" alt="image-20231011142323580"></p>
+<li><p>通过迭代器迭代<img src="D:\MyProject\MyBlog\source\images\20220110\image-20231011142323580.png" alt="image-20231011142323580"></p>
 </li>
 <li><p>获取实现类路径配置 &#x3D; “META-INF&#x2F;services&#x2F;“ + service.name; </p>
-<p><img src="C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20231011142340932.png" alt="image-20231011142340932"></p>
+<p><img src="D:\MyProject\MyBlog\source\images\20220110\image-20231011142340932.png" alt="image-20231011142340932"></p>
 </li>
 <li><p>加载实现类 </p>
-<p><img src="C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20231011142704289.png" alt="image-20231011142704289"></p>
+<p><img src="D:\MyProject\MyBlog\source\images\20220110\image-20231011142704289.png" alt="image-20231011142704289"></p>
 </li>
 </ol>
 <h2 id="不足"><a href="#不足" class="headerlink" title="不足"></a>不足</h2><p>ServiceLoader只提供了遍历的方式来获取目标实现类，假如有多个JDBC实现类，都会去加载，没有提供按需加载的方法。像<code>Dubbo SPI</code>就提供了可配置化的加载.</p>
@@ -29,7 +29,7 @@
 <li>部署在同一个Tomcat容器中相同的类库相同的版本可以共享。否则，如果服务器有10个应用程序，那么要有10份相同的类库加载进虚拟机。</li>
 <li>web容器也有自己依赖的类库，不能于应用程序的类库混淆。基于安全考虑，应该让容器的类库和程序的类库隔离开来。 总结：有些共用类只需要一份，有些类只需要多份隔离。</li>
 </ol>
-<h2 id="实现方式"><a href="#实现方式" class="headerlink" title="实现方式"></a>实现方式</h2><p><img src="https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/7eef22460ea542949c8959b62ebcfb2f~tplv-k3u1fbpfcp-zoom-in-crop-mark:1512:0:0:0.awebp?!%5Bimage-20231010110449075%5D(C:%5CUsers%5CAdministrator%5CAppData%5CRoaming%5CTypora%5Ctypora-user-images%5Cimage-20231010110449075.png" alt="image.png"></p>
+<h2 id="实现方式"><a href="#实现方式" class="headerlink" title="实现方式"></a>实现方式</h2><p><img src="https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/7eef22460ea542949c8959b62ebcfb2f~tplv-k3u1fbpfcp-zoom-in-crop-mark:1512:0:0:0.awebp?!%5Bimage-20231010110449075%5D(D:%5CMyProject%5CMyBlog%5Csource%5Cimages%5C20220110%5Cimage-20231010110449075.png" alt="image.png"></p>
 <ol>
 <li>Webapp 应用类加载器每个应用在部署后，都会创建一个唯一的类加载器。该类加载器会加载位于 WEB-INF&#x2F;lib下的jar文件中的class 和 WEB-INF&#x2F;classes下的class文件。</li>
 <li>通过<code>Common ClassLoader</code>加载通用的类。</li>
@@ -54,7 +54,7 @@
 <li><p>通过自定义类加载器，为每个中间件自定义一个加载器，这些加载器之间的关系是平行的，彼此没有依赖关系。</p>
 </li>
 <li><p>这样每个中间件的classloader就可以加载各自版本的包。因为一个类的全限定名以及加载该类的加载器两者共同形成了这个类在JVM中的惟一标识。</p>
-<p><img src="C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20231011142937570.png" alt="image-20231011142937570"></p>
+<p><img src="D:\MyProject\MyBlog\source\images\20220110\image-20231011142937570.png" alt="image-20231011142937570"></p>
 </li>
 </ol>
 ]]></content>
