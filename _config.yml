@@ -103,7 +103,7 @@ theme: next
 ## Docs: https://hexo.io/docs/one-command-deployment
 deploy:
   type: git
-  repo: http://github.com/badgodd/badgodd.github.io.git
+  repo: git@github.com:badgodd/badgodd.github.io.git
   branch: master
 
 # hexo-generator-searchdb
