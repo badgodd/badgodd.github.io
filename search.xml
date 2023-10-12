@@ -1,53 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
-    <title>线上问题FullGC</title>
-    <url>/2023/06/11/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98FullGC/</url>
-    <content><![CDATA[<h2 id="背景知识-background"><a href="#背景知识-background" class="headerlink" title="背景知识 (background)"></a>背景知识 (background)</h2><p>FullGC通常伴随着比较久的停顿和性能退化，不过不同GC算法关注点不一样。</p>
-<p>对CMS来说，FullGC是比较正常的，每次STW也比较短，但频繁的话会导致吞吐量下降，因此重点考察CMS FullGC的频率，目前1分钟超过12次就报警。</p>
-<p>CMS分两种模式：Background和Foreground，严格来说，Foreground才算FullGC。Foreground在Promotion Failed、Concurrent Mode Failure等条件下触发，是单线程串行回收的，对整个老年代进行清理、压缩，消除内存碎片，STW 时间长，有时会长达十几秒。Background是正常情况下触发的并发回收的 CMS GC，停顿非常短，对业务影响很小。</p>
-<p>对G1来说，FullGC对整个堆(Young+Old Generation)进行清理，通常意味着更大的停顿时长，是我们要竭力避免的，因此出现一次就报警。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">FullGC报警是针对老年代的GC频率，我们有单独的GC耗时报警用于捕捉停顿较久的场景。</span><br></pre></td></tr></table></figure>
+    <title>Safepoint安全点理解</title>
+    <url>/2023/06/02/Safepoint%E5%AE%89%E5%85%A8%E7%82%B9%E7%90%86%E8%A7%A3/</url>
+    <content><![CDATA[<h2 id="安全点定义"><a href="#安全点定义" class="headerlink" title="安全点定义"></a>安全点定义</h2><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Safepoint 可以理解成是在代码执行过程中的一些特殊位置，当线程执行到这些位置的时候，线程可以暂停。在 SafePoint 保存了其他位置没有的一些当前线程的运行信息，供其他线程读取。这些信息包括：线程上下文的任何信息，例如对象或者非对象的内部指针等等。我们一般这么理解 SafePoint，就是线程只有运行到了 SafePoint 的位置，他的一切状态信息，才是确定的，也只有这个时候，才知道这个线程用了哪些内存，没有用哪些；并且，只有线程处于 SafePoint 位置，这时候对 JVM的堆栈信息进行修改，例如回收某一部分不用的内存，线程才会感知到，之后继续运行，每个线程都有一份自己的内存使用快照，这时候其他线程对于内存使用的修改，线程就不知道了，只有再进行到 SafePoint 的时候，才会感知。</span><br></pre></td></tr></table></figure>
 
-<h3 id="查看指标-dashboard"><a href="#查看指标-dashboard" class="headerlink" title="查看指标 (dashboard)"></a>查看指标 (dashboard)</h3><p>展开: JVM &#x2F; 内存 &#x2F; GC &#x2F; <a href="https://so.csdn.net/so/search?q=ClassLoader&spm=1001.2101.3001.7020">ClassLoader</a>这一行，找到监控面板：GC耗时和 GC原因与频次。</p>
-<p><img src="/2023/06/11/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98FullGC/image-20231011192636268.png" alt="image-20231011192636268"></p>
-<h3 id="止损措施-action"><a href="#止损措施-action" class="headerlink" title="止损措施 (action)"></a>止损措施 (action)</h3><p>FullGC发生时，已产生负面影响。如果集中在单个节点，可考虑摘流或者调小节点权重。</p>
-<p>建议关注Old区的增长，在下次FullGC前，<code>先手动摘流，然后Dump堆内存</code>。</p>
-<h3 id="事后改进-postmortem"><a href="#事后改进-postmortem" class="headerlink" title="事后改进(postmortem)"></a>事后改进(postmortem)</h3><p>FullGC通常是老年代内存不足，放不下新晋升的对象。</p>
-<p>大概率是代码的内存开销太大，比如全量或大批量加载数据、导入导出&#x2F;上传下载等。</p>
-<p>可通过慢接口、慢查询、AccessLog 、 应用日志等初步筛选可疑接口，优化逻辑，确保单次执行的资源开销是稳定的、高效的。</p>
-<p>除此之外，请参考原因(cause)部分，针对当前业务调优GC参数，建议每次只调整一个变量，灰度观察。</p>
-<p>GC优化后，通过所选时段内累计GC耗时计算GC耗时在所选时段内的占比是否下降，所选时段内累计GC次数查看所选时段内各类型GC的次数是否有变化。优先GC耗时下降，GC频率仅做参考。</p>
-<h2 id="可能的原因-cause"><a href="#可能的原因-cause" class="headerlink" title="可能的原因 (cause)"></a>可能的原因 (cause)</h2><p>Old区通常是是生命周期比较久的对象，比如本地缓存、各种连接池的连接、监控指标、全局对象等。</p>
-<p>处理这种问题，可在Old区GC前后分别Dump内存(先摘流)，借助MAT进行内存&#x2F;对象Diff，按照对象、类、类加载器、包等多个维度观察 Histogram，分析 Unreachable。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Unreachable是可回收的对象，可用于判断某些对象是否生成过多。</span><br></pre></td></tr></table></figure>
 
-<h4 id="一、过早晋升-Premature-Promotion"><a href="#一、过早晋升-Premature-Promotion" class="headerlink" title="一、过早晋升(Premature Promotion)"></a>一、过早晋升(Premature Promotion)</h4><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">过早晋升通常以CMS+Parnew组合居多，G1的话，建议勿指定新生代大小(-Xmn)。</span><br></pre></td></tr></table></figure>
 
-<p>临时对象经过几次 Young GC后才会晋升到 Old 区，每复制到survivor区一次， GC Age 就会增长 1，最大Age通过 -XX:MaxTenuringThreshold 来控制。</p>
-<p>过早晋升一般不会直接影响 GC，常伴随着浮动垃圾、大对象担保失败等问题，我们通过以下方式交叉验证：</p>
-<p>JVM内存池里的指标Old Gen(heap)经过一次GC回收后，内存占用下降了很多，可比较 max &#x2F; min，比如，max 值为 2.5G ，GC后只剩下了 500 M，那说明，只有500MB活跃对象，其余的都被回收了。<br>GC 内存分配里新生代每秒增加的字节(申请的内存)过大，同时有很多对象晋升到了老年代(每秒新增字节)。老年代晋升的越多，就可能有过早晋升的问题。<br>查看节点的GC日志，查看对象晋升的threshold，类似new threshold 1(max 6)，说明只回收了一次就晋升了。<br>过早晋升，会增加Old区的内存占用，触发频繁的Full GC，降低吞吐量。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Old区占用超过某个阈值(+XX:CMSInitiatingOccupancyFraction/+XX:InitiatingHeapOccupancyPercent)时，CMS会触发 Background GC，G1会触发mixed gc。</span><br></pre></td></tr></table></figure>
-
-<p>常见原因是新生代(Young&#x2F;Eden区)过小，Young区被快速填满，本该回收的对象参与了 GC并晋升。另外，无法及时回收的对象还会影响-XX:MaxTenuringThreshold的动态计算，导致 threshold 变小 ，更多的临时对象进入了 Old 区，造成资源浪费。</p>
-<p>JVM内存池里的指标Eden Gen(heap)的max即 Young区的最大值，可适当调大观察效果。</p>
-<p>若在总的Heap内存不变的情况下调大Young区，可适当调小Old区，但考虑到浮动垃圾，建议Old区大小为一轮回收后Old区活跃对象的3倍左右。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">注意，调大Young区对ParNew来说每次GC Copy的对象更多了，虽然会降低GC次数，但可能增加单次GC耗时，可参考所选时段总耗时来决定优化是否有效。</span><br></pre></td></tr></table></figure>
-
-<p>除了Young区小之外，也可能是内存分配压力大，可通过<code>JVM / 内存 / GC / ClassLoader</code>里的GC内存分配面板来验证。</p>
-<p><img src="/2023/06/11/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98FullGC/image-20231011192908088.png" alt="image-20231011192908088"></p>
-<p>内存分配速率，如果是偶发的毛刺、突增，通常是业务代码加载了大批数据，可配合MAT等工具分析内存、优化代码；如果持续比较大，那说明内存不够用了，只能申请套餐扩容或者尝试G1。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">开发可筛选时间段内的慢请求、AccessLog、应用日志，缩小排查范围；尽可能保证接口内存开销的稳定性，避免浪费资源。</span><br></pre></td></tr></table></figure>
-
-<p>内存分配速率越大，GC越频繁，两次 Young GC 的间隔时间尽量大于接口P99.9的时间，这样尽量让对象在 Young 区就被回收，可以减少很多停顿。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">慢请求不只是对线程池/资源池的挤占，在多次GC期间不能被回收的垃圾就转移到Old区了。</span><br></pre></td></tr></table></figure>
-
+<h2 id="什么时候会进入Safepoint"><a href="#什么时候会进入Safepoint" class="headerlink" title="什么时候会进入Safepoint"></a>什么时候会进入Safepoint</h2><p>​	当VM Thread需要做vm 操作时会让线程进入安全点，vm操作类型有很多，可以参考<code>VM_OP_ENUM</code>源码 vmOperations.hpp。下面是几种经常发生的进入Safepoint的情形：</p>
+<ol>
+<li>GC：由于需要每个线程的对象使用信息，以及回收一些对象，释放某些堆内存或者直接内存，所以需要 进入Safepoint来 Stop the world；</li>
+<li>定时进入 SafePoint：每经过<code>-XX:GuaranteedSafepointInterval</code> 配置的时间，都会让所有线程进入 Safepoint，一旦所有线程都进入，立刻从 Safepoint 恢复。这个定时主要是为了一些没必要立刻 Stop the world 的任务执行，可以设置<code>-XX:GuaranteedSafepointInterval=0</code>关闭这个定时。</li>
+<li>由于 jstack，jmap 和 jstat 等命令，会导致 Stop the world：这种命令都需要采集堆栈信息，所以需要所有线程进入 Safepoint 并暂停。</li>
+<li>偏向锁取消：锁大部分情况是没有竞争的（某个同步块大多数情况都不会出现多线程同时竞争锁），所以可以通过偏向来提高性能。即在无竞争时，之前获得锁的线程再次获得锁时，会判断是否偏向锁指向我，那么该线程将不用再次获得锁，直接就可以进入同步块。但是高并发的情况下，偏向锁会经常失效，导致需要取消偏向锁，取消偏向锁的时候，需要 Stop the world，因为要获取每个线程使用锁的状态以及运行状态。</li>
+<li>Java Instrument 导致的 Agent 加载以及类的重定义：由于涉及到类重定义，需要修改栈上和这个类相关的信息，所以需要 Stop the world</li>
+<li>Java Code Cache相关：当发生 JIT 编译优化或者去优化，需要 OSR 或者 Bailout 或者清理代码缓存的时候，由于需要读取线程执行的方法以及改变线程执行的方法，所以需要 Stop the world</li>
+</ol>
+<h2 id="避免Safepoint副作用"><a href="#避免Safepoint副作用" class="headerlink" title="避免Safepoint副作用"></a>避免Safepoint副作用</h2><p>​	Safepoint在一定程度上是可以理解成是为了让所有用户线程停顿（Stop The World）而设计的。STW对应用系统来说是一件很可怕的事情，JVM不论是在GC还是在其他的VM操作上都在努力避免STW和减少STW时间。</p>
+<p><strong>安全点最主要的副作用就是可能导致STW时间过长，应该极力避免这点副作用。</strong></p>
+<p>​	对第一个进入安全点的线程来说，STW是从它进入安全点开始的，如果有某个线程一直无法进入安全点就会导致进入安全点的时间一直处于等待状态，进而导致STW的时间过长。所以，应避免线程执行过长无法进入安全点的情况。</p>
+<p>​	可数循环体内执行时间过长以及JIT优化导致无法进入安全点的问题是最常见的无法进入安全点的情况。在写大循环的时候可以把循环索引值数据类型定义成long。</p>
+<p>​	在高并发应用中，偏向锁并不能带来性能提升，反而因为偏向锁取消带来了很多没必要的某些线程进入安全点 。所以建议关闭：<code>-XX:-UseBiasedLocking</code>。</p>
+<p>​	jstack，jmap 和 jstat 等命令，也会导致进入安全点。所以，生产环境应该关闭Thead dump的开关，避免dump时间过长导致应用STW时间过长。</p>
 ]]></content>
       <categories>
         <category>JVM</category>
       </categories>
       <tags>
         <tag>JVM</tag>
+        <tag>Safepoint</tag>
       </tags>
   </entry>
   <entry>
@@ -89,25 +70,6 @@
       </categories>
       <tags>
         <tag>Git</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>解决hexo + Typora 图片上传问题</title>
-    <url>/2022/01/02/%E8%A7%A3%E5%86%B3hexo-Typora-%E5%9B%BE%E7%89%87%E4%B8%8A%E4%BC%A0%E9%97%AE%E9%A2%98/</url>
-    <content><![CDATA[<p>本文解决hexo + <a href="https://so.csdn.net/so/search?q=Typora&spm=1001.2101.3001.7020">Typora</a>图片上传不显示的问题</p>
-<p>按如下步骤修改设定Typora中图片放置的位置</p>
-<p>这样当自己新建一个文章后，如果添加图片，会在文章所在目录下生成一个与文章同名的文件夹，并将图片存入该文件夹中，此后该文章中所有添加的图片均存入该文件夹中。</p>
-<p><img src="/2022/01/02/%E8%A7%A3%E5%86%B3hexo-Typora-%E5%9B%BE%E7%89%87%E4%B8%8A%E4%BC%A0%E9%97%AE%E9%A2%98/image-20231011190708925.png" alt="image-20231011190708925"></p>
-<p>修改博客根目录下的_config.yml文件中的post_asset_folder字段设置为true</p>
-<p>当设置 post_asset_folder 参数后，在hexo n命令建立文件时， 会自动建立一个与文章同名的文件夹，把与该文章相关的所有图片资源都放到此文件夹内，这样就可以方便的使用图片资源</p>
-<p>同时，只有当post_asset_folder设置为true后，后续安装的插件才会起作用</p>
-<p><img src="/2022/01/02/%E8%A7%A3%E5%86%B3hexo-Typora-%E5%9B%BE%E7%89%87%E4%B8%8A%E4%BC%A0%E9%97%AE%E9%A2%98/image-20231011190829534.png" alt="image-20231011190829534"></p>
-<p>安装插件</p>
-<p>到博客的根目录下执行 npm install <a href="https://github.com/CodeFalling/hexo-asset-image">https://github.com/CodeFalling/hexo-asset-image</a> –save 命令来进行插件的安装</p>
-<p>当文章全部写完后，使用Typora的替换功能（替换功能包含删除功能，当替换的内容什么都不输入时为全部删除）将所有图片地址前面多余的部分删除即可</p>
-]]></content>
-      <tags>
-        <tag>Hexo</tag>
       </tags>
   </entry>
   <entry>
@@ -179,6 +141,75 @@
       </categories>
       <tags>
         <tag>JVM</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>线上问题FullGC</title>
+    <url>/2023/06/11/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98FullGC/</url>
+    <content><![CDATA[<h2 id="背景知识-background"><a href="#背景知识-background" class="headerlink" title="背景知识 (background)"></a>背景知识 (background)</h2><p>​	FullGC通常伴随着比较久的停顿和性能退化，不过不同GC算法关注点不一样。</p>
+<p>​	对CMS来说，FullGC是比较正常的，每次STW也比较短，但频繁的话会导致吞吐量下降，因此重点考察CMS FullGC的频率，目前1分钟超过12次就报警。</p>
+<p>​	CMS分两种模式：Background和Foreground，严格来说，Foreground才算FullGC。Foreground在Promotion Failed、Concurrent Mode Failure等条件下触发，是单线程串行回收的，对整个老年代进行清理、压缩，消除内存碎片，STW 时间长，有时会长达十几秒。Background是正常情况下触发的并发回收的 CMS GC，停顿非常短，对业务影响很小。</p>
+<p>​	对G1来说，FullGC对整个堆(Young+Old Generation)进行清理，通常意味着更大的停顿时长，是我们要竭力避免的，因此出现一次就报警。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">FullGC报警是针对老年代的GC频率，我们有单独的GC耗时报警用于捕捉停顿较久的场景。</span><br></pre></td></tr></table></figure>
+
+<h3 id="查看指标-dashboard"><a href="#查看指标-dashboard" class="headerlink" title="查看指标 (dashboard)"></a>查看指标 (dashboard)</h3><p>展开: JVM &#x2F; 内存 &#x2F; GC &#x2F; <a href="https://so.csdn.net/so/search?q=ClassLoader&spm=1001.2101.3001.7020">ClassLoader</a>这一行，找到监控面板：GC耗时和 GC原因与频次。</p>
+<p><img src="/2023/06/11/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98FullGC/image-20231011192636268.png" alt="image-20231011192636268"></p>
+<h3 id="止损措施-action"><a href="#止损措施-action" class="headerlink" title="止损措施 (action)"></a>止损措施 (action)</h3><p>FullGC发生时，已产生负面影响。如果集中在单个节点，可考虑摘流或者调小节点权重。</p>
+<p>建议关注Old区的增长，在下次FullGC前，<code>先手动摘流，然后Dump堆内存</code>。</p>
+<h3 id="事后改进-postmortem"><a href="#事后改进-postmortem" class="headerlink" title="事后改进(postmortem)"></a>事后改进(postmortem)</h3><p>FullGC通常是老年代内存不足，放不下新晋升的对象。</p>
+<p>大概率是代码的内存开销太大，比如全量或大批量加载数据、导入导出&#x2F;上传下载等。</p>
+<p>可通过慢接口、慢查询、AccessLog 、 应用日志等初步筛选可疑接口，优化逻辑，确保单次执行的资源开销是稳定的、高效的。</p>
+<p>除此之外，请参考原因(cause)部分，针对当前业务调优GC参数，建议每次只调整一个变量，灰度观察。</p>
+<p>GC优化后，通过所选时段内累计GC耗时计算GC耗时在所选时段内的占比是否下降，所选时段内累计GC次数查看所选时段内各类型GC的次数是否有变化。优先GC耗时下降，GC频率仅做参考。</p>
+<h2 id="可能的原因-cause"><a href="#可能的原因-cause" class="headerlink" title="可能的原因 (cause)"></a>可能的原因 (cause)</h2><p>Old区通常是是生命周期比较久的对象，比如本地缓存、各种连接池的连接、监控指标、全局对象等。</p>
+<p>处理这种问题，可在Old区GC前后分别Dump内存(先摘流)，借助MAT进行内存&#x2F;对象Diff，按照对象、类、类加载器、包等多个维度观察 Histogram，分析 Unreachable。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Unreachable是可回收的对象，可用于判断某些对象是否生成过多。</span><br></pre></td></tr></table></figure>
+
+<h4 id="一、过早晋升-Premature-Promotion"><a href="#一、过早晋升-Premature-Promotion" class="headerlink" title="一、过早晋升(Premature Promotion)"></a>一、过早晋升(Premature Promotion)</h4><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">过早晋升通常以CMS+Parnew组合居多，G1的话，建议勿指定新生代大小(-Xmn)。</span><br></pre></td></tr></table></figure>
+
+<p>​	临时对象经过几次 Young GC后才会晋升到 Old 区，每复制到survivor区一次， GC Age 就会增长 1，最大Age通过 -XX:MaxTenuringThreshold 来控制。</p>
+<p>过早晋升一般不会直接影响 GC，常伴随着浮动垃圾、大对象担保失败等问题，我们通过以下方式交叉验证：</p>
+<p>JVM内存池里的指标Old Gen(heap)经过一次GC回收后，内存占用下降了很多，可比较 max &#x2F; min，比如，max 值为 2.5G ，GC后只剩下了 500 M，那说明，只有500MB活跃对象，其余的都被回收了。<br>GC 内存分配里新生代每秒增加的字节(申请的内存)过大，同时有很多对象晋升到了老年代(每秒新增字节)。老年代晋升的越多，就可能有过早晋升的问题。<br>查看节点的GC日志，查看对象晋升的threshold，类似new threshold 1(max 6)，说明只回收了一次就晋升了。<br>过早晋升，会增加Old区的内存占用，触发频繁的Full GC，降低吞吐量。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Old区占用超过某个阈值(+XX:CMSInitiatingOccupancyFraction/+XX:InitiatingHeapOccupancyPercent)时，CMS会触发 Background GC，G1会触发mixed gc。</span><br></pre></td></tr></table></figure>
+
+<p>​	常见原因是新生代(Young&#x2F;Eden区)过小，Young区被快速填满，本该回收的对象参与了 GC并晋升。另外，无法及时回收的对象还会影响-XX:MaxTenuringThreshold的动态计算，导致 threshold 变小 ，更多的临时对象进入了 Old 区，造成资源浪费。</p>
+<p>JVM内存池里的指标Eden Gen(heap)的max即 Young区的最大值，可适当调大观察效果。</p>
+<p>若在总的Heap内存不变的情况下调大Young区，可适当调小Old区，但考虑到浮动垃圾，建议Old区大小为一轮回收后Old区活跃对象的3倍左右。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">注意，调大Young区对ParNew来说每次GC Copy的对象更多了，虽然会降低GC次数，但可能增加单次GC耗时，可参考所选时段总耗时来决定优化是否有效。</span><br></pre></td></tr></table></figure>
+
+<p>除了Young区小之外，也可能是内存分配压力大，可通过<code>JVM / 内存 / GC / ClassLoader</code>里的GC内存分配面板来验证。</p>
+<p><img src="/2023/06/11/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98FullGC/image-20231011192908088.png" alt="image-20231011192908088"></p>
+<p>内存分配速率，如果是偶发的毛刺、突增，通常是业务代码加载了大批数据，可配合MAT等工具分析内存、优化代码；如果持续比较大，那说明内存不够用了，只能申请套餐扩容或者尝试G1。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">开发可筛选时间段内的慢请求、AccessLog、应用日志，缩小排查范围；尽可能保证接口内存开销的稳定性，避免浪费资源。</span><br></pre></td></tr></table></figure>
+
+<p>内存分配速率越大，GC越频繁，两次 Young GC 的间隔时间尽量大于接口P99.9的时间，这样尽量让对象在 Young 区就被回收，可以减少很多停顿。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">慢请求不只是对线程池/资源池的挤占，在多次GC期间不能被回收的垃圾就转移到Old区了。</span><br></pre></td></tr></table></figure>
+
+]]></content>
+      <categories>
+        <category>JVM</category>
+      </categories>
+      <tags>
+        <tag>JVM</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>解决hexo + Typora 图片上传问题</title>
+    <url>/2022/01/02/%E8%A7%A3%E5%86%B3hexo-Typora-%E5%9B%BE%E7%89%87%E4%B8%8A%E4%BC%A0%E9%97%AE%E9%A2%98/</url>
+    <content><![CDATA[<p>本文解决hexo + <a href="https://so.csdn.net/so/search?q=Typora&spm=1001.2101.3001.7020">Typora</a>图片上传不显示的问题</p>
+<p>按如下步骤修改设定Typora中图片放置的位置</p>
+<p>这样当自己新建一个文章后，如果添加图片，会在文章所在目录下生成一个与文章同名的文件夹，并将图片存入该文件夹中，此后该文章中所有添加的图片均存入该文件夹中。</p>
+<p><img src="/2022/01/02/%E8%A7%A3%E5%86%B3hexo-Typora-%E5%9B%BE%E7%89%87%E4%B8%8A%E4%BC%A0%E9%97%AE%E9%A2%98/image-20231011190708925.png" alt="image-20231011190708925"></p>
+<p>修改博客根目录下的_config.yml文件中的post_asset_folder字段设置为true</p>
+<p>当设置 post_asset_folder 参数后，在hexo n命令建立文件时， 会自动建立一个与文章同名的文件夹，把与该文章相关的所有图片资源都放到此文件夹内，这样就可以方便的使用图片资源</p>
+<p>同时，只有当post_asset_folder设置为true后，后续安装的插件才会起作用</p>
+<p><img src="/2022/01/02/%E8%A7%A3%E5%86%B3hexo-Typora-%E5%9B%BE%E7%89%87%E4%B8%8A%E4%BC%A0%E9%97%AE%E9%A2%98/image-20231011190829534.png" alt="image-20231011190829534"></p>
+<p>安装插件</p>
+<p>到博客的根目录下执行 npm install <a href="https://github.com/CodeFalling/hexo-asset-image">https://github.com/CodeFalling/hexo-asset-image</a> –save 命令来进行插件的安装</p>
+<p>当文章全部写完后，使用Typora的替换功能（替换功能包含删除功能，当替换的内容什么都不输入时为全部删除）将所有图片地址前面多余的部分删除即可</p>
+]]></content>
+      <tags>
+        <tag>Hexo</tag>
       </tags>
   </entry>
 </search>

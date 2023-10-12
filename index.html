@@ -252,10 +252,10 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <h2 id="背景知识-background"><a href="#背景知识-background" class="headerlink" title="背景知识 (background)"></a>背景知识 (background)</h2><p>FullGC通常伴随着比较久的停顿和性能退化，不过不同GC算法关注点不一样。</p>
-<p>对CMS来说，FullGC是比较正常的，每次STW也比较短，但频繁的话会导致吞吐量下降，因此重点考察CMS FullGC的频率，目前1分钟超过12次就报警。</p>
-<p>CMS分两种模式：Background和Foreground，严格来说，Foreground才算FullGC。Foreground在Promotion Failed、Concurrent Mode Failure等条件下触发，是单线程串行回收的，对整个老年代进行清理、压缩，消除内存碎片，STW 时间长，有时会长达十几秒。Background是正常情况下触发的并发回收的 CMS GC，停顿非常短，对业务影响很小。</p>
-<p>对G1来说，FullGC对整个堆(Young+Old Generation)进行清理，通常意味着更大的停顿时长，是我们要竭力避免的，因此出现一次就报警。</p>
+          <h2 id="背景知识-background"><a href="#背景知识-background" class="headerlink" title="背景知识 (background)"></a>背景知识 (background)</h2><p>​	FullGC通常伴随着比较久的停顿和性能退化，不过不同GC算法关注点不一样。</p>
+<p>​	对CMS来说，FullGC是比较正常的，每次STW也比较短，但频繁的话会导致吞吐量下降，因此重点考察CMS FullGC的频率，目前1分钟超过12次就报警。</p>
+<p>​	CMS分两种模式：Background和Foreground，严格来说，Foreground才算FullGC。Foreground在Promotion Failed、Concurrent Mode Failure等条件下触发，是单线程串行回收的，对整个老年代进行清理、压缩，消除内存碎片，STW 时间长，有时会长达十几秒。Background是正常情况下触发的并发回收的 CMS GC，停顿非常短，对业务影响很小。</p>
+<p>​	对G1来说，FullGC对整个堆(Young+Old Generation)进行清理，通常意味着更大的停顿时长，是我们要竭力避免的，因此出现一次就报警。</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">FullGC报警是针对老年代的GC频率，我们有单独的GC耗时报警用于捕捉停顿较久的场景。</span><br></pre></td></tr></table></figure>
 
 <h3 id="查看指标-dashboard"><a href="#查看指标-dashboard" class="headerlink" title="查看指标 (dashboard)"></a>查看指标 (dashboard)</h3><p>展开: JVM &#x2F; 内存 &#x2F; GC &#x2F; <a target="_blank" rel="noopener" href="https://so.csdn.net/so/search?q=ClassLoader&spm=1001.2101.3001.7020">ClassLoader</a>这一行，找到监控面板：GC耗时和 GC原因与频次。</p>
@@ -273,12 +273,12 @@
 
 <h4 id="一、过早晋升-Premature-Promotion"><a href="#一、过早晋升-Premature-Promotion" class="headerlink" title="一、过早晋升(Premature Promotion)"></a>一、过早晋升(Premature Promotion)</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">过早晋升通常以CMS+Parnew组合居多，G1的话，建议勿指定新生代大小(-Xmn)。</span><br></pre></td></tr></table></figure>
 
-<p>临时对象经过几次 Young GC后才会晋升到 Old 区，每复制到survivor区一次， GC Age 就会增长 1，最大Age通过 -XX:MaxTenuringThreshold 来控制。</p>
+<p>​	临时对象经过几次 Young GC后才会晋升到 Old 区，每复制到survivor区一次， GC Age 就会增长 1，最大Age通过 -XX:MaxTenuringThreshold 来控制。</p>
 <p>过早晋升一般不会直接影响 GC，常伴随着浮动垃圾、大对象担保失败等问题，我们通过以下方式交叉验证：</p>
 <p>JVM内存池里的指标Old Gen(heap)经过一次GC回收后，内存占用下降了很多，可比较 max &#x2F; min，比如，max 值为 2.5G ，GC后只剩下了 500 M，那说明，只有500MB活跃对象，其余的都被回收了。<br>GC 内存分配里新生代每秒增加的字节(申请的内存)过大，同时有很多对象晋升到了老年代(每秒新增字节)。老年代晋升的越多，就可能有过早晋升的问题。<br>查看节点的GC日志，查看对象晋升的threshold，类似new threshold 1(max 6)，说明只回收了一次就晋升了。<br>过早晋升，会增加Old区的内存占用，触发频繁的Full GC，降低吞吐量。</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Old区占用超过某个阈值(+XX:CMSInitiatingOccupancyFraction/+XX:InitiatingHeapOccupancyPercent)时，CMS会触发 Background GC，G1会触发mixed gc。</span><br></pre></td></tr></table></figure>
 
-<p>常见原因是新生代(Young&#x2F;Eden区)过小，Young区被快速填满，本该回收的对象参与了 GC并晋升。另外，无法及时回收的对象还会影响-XX:MaxTenuringThreshold的动态计算，导致 threshold 变小 ，更多的临时对象进入了 Old 区，造成资源浪费。</p>
+<p>​	常见原因是新生代(Young&#x2F;Eden区)过小，Young区被快速填满，本该回收的对象参与了 GC并晋升。另外，无法及时回收的对象还会影响-XX:MaxTenuringThreshold的动态计算，导致 threshold 变小 ，更多的临时对象进入了 Old 区，造成资源浪费。</p>
 <p>JVM内存池里的指标Eden Gen(heap)的max即 Young区的最大值，可适当调大观察效果。</p>
 <p>若在总的Heap内存不变的情况下调大Young区，可适当调小Old区，但考虑到浮动垃圾，建议Old区大小为一轮回收后Old区活跃对象的3倍左右。</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">注意，调大Young区对ParNew来说每次GC Copy的对象更多了，虽然会降低GC次数，但可能增加单次GC耗时，可参考所选时段总耗时来决定优化是否有效。</span><br></pre></td></tr></table></figure>
@@ -291,6 +291,105 @@
 <p>内存分配速率越大，GC越频繁，两次 Young GC 的间隔时间尽量大于接口P99.9的时间，这样尽量让对象在 Young 区就被回收，可以减少很多停顿。</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">慢请求不只是对线程池/资源池的挤占，在多次GC期间不能被回收的垃圾就转移到Old区了。</span><br></pre></td></tr></table></figure>
 
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2023/06/02/Safepoint%E5%AE%89%E5%85%A8%E7%82%B9%E7%90%86%E8%A7%A3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/touxiang.jpg">
+      <meta itemprop="name" content="bad godd">
+      <meta itemprop="description" content="无问东西">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Bad Godd's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2023/06/02/Safepoint%E5%AE%89%E5%85%A8%E7%82%B9%E7%90%86%E8%A7%A3/" class="post-title-link" itemprop="url">Safepoint安全点理解</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2023-06-02 14:22:44" itemprop="dateCreated datePublished" datetime="2023-06-02T14:22:44+08:00">2023-06-02</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/JVM/" itemprop="url" rel="index"><span itemprop="name">JVM</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>1.6k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>1 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="安全点定义"><a href="#安全点定义" class="headerlink" title="安全点定义"></a>安全点定义</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Safepoint 可以理解成是在代码执行过程中的一些特殊位置，当线程执行到这些位置的时候，线程可以暂停。在 SafePoint 保存了其他位置没有的一些当前线程的运行信息，供其他线程读取。这些信息包括：线程上下文的任何信息，例如对象或者非对象的内部指针等等。我们一般这么理解 SafePoint，就是线程只有运行到了 SafePoint 的位置，他的一切状态信息，才是确定的，也只有这个时候，才知道这个线程用了哪些内存，没有用哪些；并且，只有线程处于 SafePoint 位置，这时候对 JVM的堆栈信息进行修改，例如回收某一部分不用的内存，线程才会感知到，之后继续运行，每个线程都有一份自己的内存使用快照，这时候其他线程对于内存使用的修改，线程就不知道了，只有再进行到 SafePoint 的时候，才会感知。</span><br></pre></td></tr></table></figure>
+
+
+
+<h2 id="什么时候会进入Safepoint"><a href="#什么时候会进入Safepoint" class="headerlink" title="什么时候会进入Safepoint"></a>什么时候会进入Safepoint</h2><p>​	当VM Thread需要做vm 操作时会让线程进入安全点，vm操作类型有很多，可以参考<code>VM_OP_ENUM</code>源码 vmOperations.hpp。下面是几种经常发生的进入Safepoint的情形：</p>
+<ol>
+<li>GC：由于需要每个线程的对象使用信息，以及回收一些对象，释放某些堆内存或者直接内存，所以需要 进入Safepoint来 Stop the world；</li>
+<li>定时进入 SafePoint：每经过<code>-XX:GuaranteedSafepointInterval</code> 配置的时间，都会让所有线程进入 Safepoint，一旦所有线程都进入，立刻从 Safepoint 恢复。这个定时主要是为了一些没必要立刻 Stop the world 的任务执行，可以设置<code>-XX:GuaranteedSafepointInterval=0</code>关闭这个定时。</li>
+<li>由于 jstack，jmap 和 jstat 等命令，会导致 Stop the world：这种命令都需要采集堆栈信息，所以需要所有线程进入 Safepoint 并暂停。</li>
+<li>偏向锁取消：锁大部分情况是没有竞争的（某个同步块大多数情况都不会出现多线程同时竞争锁），所以可以通过偏向来提高性能。即在无竞争时，之前获得锁的线程再次获得锁时，会判断是否偏向锁指向我，那么该线程将不用再次获得锁，直接就可以进入同步块。但是高并发的情况下，偏向锁会经常失效，导致需要取消偏向锁，取消偏向锁的时候，需要 Stop the world，因为要获取每个线程使用锁的状态以及运行状态。</li>
+<li>Java Instrument 导致的 Agent 加载以及类的重定义：由于涉及到类重定义，需要修改栈上和这个类相关的信息，所以需要 Stop the world</li>
+<li>Java Code Cache相关：当发生 JIT 编译优化或者去优化，需要 OSR 或者 Bailout 或者清理代码缓存的时候，由于需要读取线程执行的方法以及改变线程执行的方法，所以需要 Stop the world</li>
+</ol>
+<h2 id="避免Safepoint副作用"><a href="#避免Safepoint副作用" class="headerlink" title="避免Safepoint副作用"></a>避免Safepoint副作用</h2><p>​	Safepoint在一定程度上是可以理解成是为了让所有用户线程停顿（Stop The World）而设计的。STW对应用系统来说是一件很可怕的事情，JVM不论是在GC还是在其他的VM操作上都在努力避免STW和减少STW时间。</p>
+<p><strong>安全点最主要的副作用就是可能导致STW时间过长，应该极力避免这点副作用。</strong></p>
+<p>​	对第一个进入安全点的线程来说，STW是从它进入安全点开始的，如果有某个线程一直无法进入安全点就会导致进入安全点的时间一直处于等待状态，进而导致STW的时间过长。所以，应避免线程执行过长无法进入安全点的情况。</p>
+<p>​	可数循环体内执行时间过长以及JIT优化导致无法进入安全点的问题是最常见的无法进入安全点的情况。在写大循环的时候可以把循环索引值数据类型定义成long。</p>
+<p>​	在高并发应用中，偏向锁并不能带来性能提升，反而因为偏向锁取消带来了很多没必要的某些线程进入安全点 。所以建议关闭：<code>-XX:-UseBiasedLocking</code>。</p>
+<p>​	jstack，jmap 和 jstat 等命令，也会导致进入安全点。所以，生产环境应该关闭Thead dump的开关，避免dump时间过长导致应用STW时间过长。</p>
 
       
     </div>
@@ -706,7 +805,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">4</span>
+          <span class="site-state-item-count">5</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -719,7 +818,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">3</span>
+        <span class="site-state-item-count">4</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
