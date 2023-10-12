@@ -9,13 +9,13 @@ categories:
 
 ## 背景知识 (background)
 
-FullGC通常伴随着比较久的停顿和性能退化，不过不同GC算法关注点不一样。
+​	FullGC通常伴随着比较久的停顿和性能退化，不过不同GC算法关注点不一样。
 
-对CMS来说，FullGC是比较正常的，每次STW也比较短，但频繁的话会导致吞吐量下降，因此重点考察CMS FullGC的频率，目前1分钟超过12次就报警。
+​	对CMS来说，FullGC是比较正常的，每次STW也比较短，但频繁的话会导致吞吐量下降，因此重点考察CMS FullGC的频率，目前1分钟超过12次就报警。
 
-CMS分两种模式：Background和Foreground，严格来说，Foreground才算FullGC。Foreground在Promotion Failed、Concurrent Mode Failure等条件下触发，是单线程串行回收的，对整个老年代进行清理、压缩，消除内存碎片，STW 时间长，有时会长达十几秒。Background是正常情况下触发的并发回收的 CMS GC，停顿非常短，对业务影响很小。
+​	CMS分两种模式：Background和Foreground，严格来说，Foreground才算FullGC。Foreground在Promotion Failed、Concurrent Mode Failure等条件下触发，是单线程串行回收的，对整个老年代进行清理、压缩，消除内存碎片，STW 时间长，有时会长达十几秒。Background是正常情况下触发的并发回收的 CMS GC，停顿非常短，对业务影响很小。
 
-对G1来说，FullGC对整个堆(Young+Old Generation)进行清理，通常意味着更大的停顿时长，是我们要竭力避免的，因此出现一次就报警。
+​	对G1来说，FullGC对整个堆(Young+Old Generation)进行清理，通常意味着更大的停顿时长，是我们要竭力避免的，因此出现一次就报警。
 
 
 ```
@@ -64,7 +64,7 @@ Unreachable是可回收的对象，可用于判断某些对象是否生成过多
 过早晋升通常以CMS+Parnew组合居多，G1的话，建议勿指定新生代大小(-Xmn)。
 ```
 
-临时对象经过几次 Young GC后才会晋升到 Old 区，每复制到survivor区一次， GC Age 就会增长 1，最大Age通过 -XX:MaxTenuringThreshold 来控制。
+​	临时对象经过几次 Young GC后才会晋升到 Old 区，每复制到survivor区一次， GC Age 就会增长 1，最大Age通过 -XX:MaxTenuringThreshold 来控制。
 
 过早晋升一般不会直接影响 GC，常伴随着浮动垃圾、大对象担保失败等问题，我们通过以下方式交叉验证：
 
@@ -77,7 +77,7 @@ GC 内存分配里新生代每秒增加的字节(申请的内存)过大，同时
 Old区占用超过某个阈值(+XX:CMSInitiatingOccupancyFraction/+XX:InitiatingHeapOccupancyPercent)时，CMS会触发 Background GC，G1会触发mixed gc。
 ```
 
-常见原因是新生代(Young/Eden区)过小，Young区被快速填满，本该回收的对象参与了 GC并晋升。另外，无法及时回收的对象还会影响-XX:MaxTenuringThreshold的动态计算，导致 threshold 变小 ，更多的临时对象进入了 Old 区，造成资源浪费。
+​	常见原因是新生代(Young/Eden区)过小，Young区被快速填满，本该回收的对象参与了 GC并晋升。另外，无法及时回收的对象还会影响-XX:MaxTenuringThreshold的动态计算，导致 threshold 变小 ，更多的临时对象进入了 Old 区，造成资源浪费。
 
 JVM内存池里的指标Eden Gen(heap)的max即 Young区的最大值，可适当调大观察效果。
 
