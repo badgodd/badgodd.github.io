@@ -9,7 +9,7 @@ categories:
 
 ## 一、问题描述
 
-项目上想合并学弟的代码，以自己的分支master作为主分支，要合并学弟的分支study，结果
+项目上想合并代码，以自己的分支master作为主分支，要合并分支study，结果
 在 git merge study 的时候报如下错误
 其实在 git checkout 的时候也会出现这个错误
 
@@ -20,7 +20,7 @@ error: pathspec 'origin/XXX' did not match any file(s) known to git.
 
 ## 二、解决办法
 
-1、首先看下所有分支 是否有学弟的新分支
+1、首先看下所有分支 是否有新分支
 
 ```
 git branch -a
@@ -46,7 +46,7 @@ From codeup.aliyun.com:5eeb0689892c58bb7c394ab5/pxb/pxb-fronted
 
 
 
-3、切换到远程学弟分支:
+3、切换到远程分支:
 
 git checkout origin/xxx
 
@@ -74,13 +74,13 @@ HEAD is now at dc877cd XXX
 
 ```
 
-4、现在可以看到自己的分支是一串数字字母，这时新建并切换到学弟的分支
+4、现在可以看到自己的分支是一串数字字母，这时新建并切换到分支
 
 ```
 git checkout -b xxx
 ```
 
-5、现在需要跟远程的学弟分支进行关联
+5、现在需要跟远程的分支进行关联
 
 ```
 git branch -u origin/xxx
@@ -92,4 +92,3 @@ git branch -u origin/xxx
 Already up-to-date.
 ```
 
-大功告成~
