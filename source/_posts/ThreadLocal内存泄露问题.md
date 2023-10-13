@@ -64,7 +64,7 @@ ThreadLocal对象中是有两个引用的，一个是栈上的ThreadLocal引用�
 
 在线程池中，重复利用线程的时候，就会导致这个引用一直在，而value就一直无法被回收。
 
-那么如何解决呢？
+那如何解决呢？
 
 ThreadLocalMap底层使用数组来保存元素，使用“线性探测法”来解决hash冲突的，在每次调用ThreadLocal的get、set、remove等方法的时候，内部会实际调用ThreadLocalMap的get、set、remove等操作。
 
