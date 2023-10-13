@@ -32,6 +32,37 @@
       </tags>
   </entry>
   <entry>
+    <title>Young GC过于频繁</title>
+    <url>/2023/03/13/Young-GC%E8%BF%87%E4%BA%8E%E9%A2%91%E7%B9%81/</url>
+    <content><![CDATA[<h2 id="背景知识-background"><a href="#背景知识-background" class="headerlink" title="背景知识 (background)"></a>背景知识 (background)</h2><p>Young GC过于频繁，主要有以下影响：</p>
+<p>GC线程消耗的CPU时间过多，容易触发Linux CFS 限制进程的CPU<br>虽然单次GC停顿较短，但频次高了之后，整个服务的吞吐量会下降<br>GC过于频繁，慢请求产生的临时对象经过几轮YoungGC后容易晋升到老年代<br>目前YoungGC一分钟超过60次，则会触发报警，建议控制在20次&#x2F;分钟以内。</p>
+<h2 id="查看指标-dashboard"><a href="#查看指标-dashboard" class="headerlink" title="查看指标 (dashboard)"></a>查看指标 (dashboard)</h2><p>展开: JVM &#x2F; 内存 &#x2F; GC &#x2F; ClassLoader这一行，找到监控面板：GC耗时 和 GC原因与频次。</p>
+<p><img src="/2023/03/13/Young-GC%E8%BF%87%E4%BA%8E%E9%A2%91%E7%B9%81/image-20231013105605631.png" alt="image-20231013105605631"></p>
+<h2 id="止损措施-action"><a href="#止损措施-action" class="headerlink" title="止损措施 (action)"></a>止损措施 (action)</h2><p>Young GC频繁，通常不用立即处理，大多需要优化代码。</p>
+<p>不同物理机的配置、性能各异，若因CPU限制导致长尾请求集中在某个节点上，可先摘流。</p>
+<p>事后改进(postmortem)<br>Young GC过于频繁，说明JVM内存分配压力大，可能是Young区比较小或者代码加载到内存的数据过多。</p>
+<p>可参考原因部分，优化代码，调整GC参数。</p>
+<p>尽量一次调整一个GC参数，灰度观察，排除干扰数据</p>
+<h2 id="可能的原因-cause"><a href="#可能的原因-cause" class="headerlink" title="可能的原因 (cause)"></a>可能的原因 (cause)</h2><p>YoungGC频繁一般是内存问题，在优化代码降低频率的同时，也需关注某个时间段的累计耗时。总的来说，在CPU Quota允许的范围内，GC总耗时越少越好，GC频率反倒不是那么重要。</p>
+<p>一、Eden区过小<br>g1 newSizePercent</p>
+<p>二. 大批量加载数据。</p>
+<p>三. 内存分配速率过高</p>
+<p>代码原因导致的数据加载过多，常见于：</p>
+<ol>
+<li>文件上传下载、报表导入导出</li>
+<li>数据量随业务发展突增，代码没有分页或没有限制分页大小，或部分请求参数组合导致返回了大量数据</li>
+<li>业务逻辑涉及的内存全量加载到内存里计算，不复用中间结果，相同的数据重复请求</li>
+<li>Redis缓存了大List，导致序列化&#x2F;反序列化临时对象过多</li>
+</ol>
+]]></content>
+      <categories>
+        <category>JVM</category>
+      </categories>
+      <tags>
+        <tag>GC</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>git使用中 error: pathspec ‘xxx‘ did not match any file(s) known to git 报错解决方法</title>
     <url>/2022/01/03/git%E4%BD%BF%E7%94%A8%E4%B8%AD-error-pathspec-%E2%80%98xxx%E2%80%98-did-not-match-any-file-s-known-to-git-%E6%8A%A5%E9%94%99%E8%A7%A3%E5%86%B3%E6%96%B9%E6%B3%95/</url>
     <content><![CDATA[<h2 id="一、问题描述"><a href="#一、问题描述" class="headerlink" title="一、问题描述"></a>一、问题描述</h2><p>项目上想合并学弟的代码，以自己的分支master作为主分支，要合并学弟的分支study，结果<br>在 git merge study 的时候报如下错误<br>其实在 git checkout 的时候也会出现这个错误</p>
@@ -190,7 +221,7 @@
         <category>JVM</category>
       </categories>
       <tags>
-        <tag>JVM</tag>
+        <tag>GC</tag>
       </tags>
   </entry>
   <entry>
