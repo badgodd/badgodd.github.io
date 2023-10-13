@@ -46,7 +46,7 @@ Thread类对象中维护了ThreadLocalMap成员变量，而ThreadLocalMap维护�
 
 
 
-ThreadLocal对象，是有两个引用的，一个是栈上的ThreadLocal引用，一个是ThreadLocalMap中的Key对他的引用。那么栈上的ThreadLocal引用不在使用了，即方法结束后这个对象引用就不再用了，那么，ThreadLocal对象因为还有一条引用链在，所以就会导致他无法被回收，久而久之可能就会对导致OOM。
+ThreadLocal对象中是有两个引用的，一个是栈上的ThreadLocal引用，一个是ThreadLocalMap中的Key对他的引用。那么栈上的ThreadLocal引用不在使用了，即方法结束后这个对象引用就不再用了，那么，ThreadLocal对象因为还有一条引用链在，所以就会导致他无法被回收，久而久之可能就会对导致OOM。
 
 这就是我们所说的ThreadLocal的内存泄露问题，为了解决这个问题，ThreadLocalMap使用了弱引用。如果用了弱引用，那么ThreadLocal对象就可以在下次GC的时候被回收掉了。
 
