@@ -20,22 +20,17 @@
     var CONFIG = {"hostname":"badgodd.github.io","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
-  <meta name="description" content="背景知识 (background)Young GC过于频繁，主要有以下影响： GC线程消耗的CPU时间过多，容易触发Linux CFS 限制进程的CPU虽然单次GC停顿较短，但频次高了之后，整个服务的吞吐量会下降GC过于频繁，慢请求产生的临时对象经过几轮YoungGC后容易晋升到老年代目前YoungGC一分钟超过60次，则会触发报警，建议控制在20次&#x2F;分钟以内。 查看指标 (dashbo">
-<meta property="og:type" content="article">
-<meta property="og:title" content="Young GC过于频繁">
-<meta property="og:url" content="https://badgodd.github.io/2023/03/13/Young-GC%E8%BF%87%E4%BA%8E%E9%A2%91%E7%B9%81/index.html">
+  <meta name="description" content="无问东西">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Bad Godd&#39;s Blog">
+<meta property="og:url" content="https://badgodd.github.io/tags/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98/index.html">
 <meta property="og:site_name" content="Bad Godd&#39;s Blog">
-<meta property="og:description" content="背景知识 (background)Young GC过于频繁，主要有以下影响： GC线程消耗的CPU时间过多，容易触发Linux CFS 限制进程的CPU虽然单次GC停顿较短，但频次高了之后，整个服务的吞吐量会下降GC过于频繁，慢请求产生的临时对象经过几轮YoungGC后容易晋升到老年代目前YoungGC一分钟超过60次，则会触发报警，建议控制在20次&#x2F;分钟以内。 查看指标 (dashbo">
+<meta property="og:description" content="无问东西">
 <meta property="og:locale" content="zh_CN">
-<meta property="og:image" content="https://badgodd.github.io/2023/03/13/Young-GC%E8%BF%87%E4%BA%8E%E9%A2%91%E7%B9%81/image-20231013105605631.png">
-<meta property="article:published_time" content="2023-03-13T02:54:29.000Z">
-<meta property="article:modified_time" content="2023-10-13T02:57:21.270Z">
 <meta property="article:author" content="bad godd">
-<meta property="article:tag" content="GC">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="https://badgodd.github.io/2023/03/13/Young-GC%E8%BF%87%E4%BA%8E%E9%A2%91%E7%B9%81/image-20231013105605631.png">
 
-<link rel="canonical" href="https://badgodd.github.io/2023/03/13/Young-GC%E8%BF%87%E4%BA%8E%E9%A2%91%E7%B9%81/">
+<link rel="canonical" href="https://badgodd.github.io/tags/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98/">
 
 
 <script id="page-configurations">
@@ -43,12 +38,12 @@
   CONFIG.page = {
     sidebar: "",
     isHome : false,
-    isPost : true,
+    isPost : false,
     lang   : 'zh-CN'
   };
 </script>
 
-  <title>Young GC过于频繁 | Bad Godd's Blog</title>
+  <title>标签: 线上问题 | Bad Godd's Blog</title>
   
 
 
@@ -190,141 +185,51 @@
         <div class="content-wrap">
           
 
-          <div class="content post posts-expand">
+          <div class="content tag">
             
 
-    
   
   
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2023/03/13/Young-GC%E8%BF%87%E4%BA%8E%E9%A2%91%E7%B9%81/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/touxiang.jpg">
-      <meta itemprop="name" content="bad godd">
-      <meta itemprop="description" content="无问东西">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Bad Godd's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          Young GC过于频繁
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2023-03-13 10:54:29" itemprop="dateCreated datePublished" datetime="2023-03-13T10:54:29+08:00">2023-03-13</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/JVM/" itemprop="url" rel="index"><span itemprop="name">JVM</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>747</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
+  
+  <div class="post-block">
+    <div class="posts-collapse">
+      <div class="collection-title">
+        <h2 class="collection-header">线上问题
+          <small>标签</small>
+        </h2>
+      </div>
 
       
-        <h2 id="背景知识-background"><a href="#背景知识-background" class="headerlink" title="背景知识 (background)"></a>背景知识 (background)</h2><p>Young GC过于频繁，主要有以下影响：</p>
-<p>GC线程消耗的CPU时间过多，容易触发Linux CFS 限制进程的CPU<br>虽然单次GC停顿较短，但频次高了之后，整个服务的吞吐量会下降<br>GC过于频繁，慢请求产生的临时对象经过几轮YoungGC后容易晋升到老年代<br>目前YoungGC一分钟超过60次，则会触发报警，建议控制在20次&#x2F;分钟以内。</p>
-<h2 id="查看指标-dashboard"><a href="#查看指标-dashboard" class="headerlink" title="查看指标 (dashboard)"></a>查看指标 (dashboard)</h2><p>展开: JVM &#x2F; 内存 &#x2F; GC &#x2F; ClassLoader这一行，找到监控面板：GC耗时 和 GC原因与频次。</p>
-<p><img src="/2023/03/13/Young-GC%E8%BF%87%E4%BA%8E%E9%A2%91%E7%B9%81/image-20231013105605631.png" alt="image-20231013105605631"></p>
-<h2 id="止损措施-action"><a href="#止损措施-action" class="headerlink" title="止损措施 (action)"></a>止损措施 (action)</h2><p>Young GC频繁，通常不用立即处理，大多需要优化代码。</p>
-<p>不同物理机的配置、性能各异，若因CPU限制导致长尾请求集中在某个节点上，可先摘流。</p>
-<p>事后改进(postmortem)<br>Young GC过于频繁，说明JVM内存分配压力大，可能是Young区比较小或者代码加载到内存的数据过多。</p>
-<p>可参考原因部分，优化代码，调整GC参数。</p>
-<p>尽量一次调整一个GC参数，灰度观察，排除干扰数据</p>
-<h2 id="可能的原因-cause"><a href="#可能的原因-cause" class="headerlink" title="可能的原因 (cause)"></a>可能的原因 (cause)</h2><p>YoungGC频繁一般是内存问题，在优化代码降低频率的同时，也需关注某个时间段的累计耗时。总的来说，在CPU Quota允许的范围内，GC总耗时越少越好，GC频率反倒不是那么重要。</p>
-<p>一、Eden区过小<br>g1 newSizePercent</p>
-<p>二. 大批量加载数据。</p>
-<p>三. 内存分配速率过高</p>
-<p>代码原因导致的数据加载过多，常见于：</p>
-<ol>
-<li>文件上传下载、报表导入导出</li>
-<li>数据量随业务发展突增，代码没有分页或没有限制分页大小，或部分请求参数组合导致返回了大量数据</li>
-<li>业务逻辑涉及的内存全量加载到内存里计算，不复用中间结果，相同的数据重复请求</li>
-<li>Redis缓存了大List，导致序列化&#x2F;反序列化临时对象过多</li>
-</ol>
-
+    <div class="collection-year">
+      <span class="collection-header">2023</span>
     </div>
 
-    
-    
-    
-        
+  <article itemscope itemtype="http://schema.org/Article">
+    <header class="post-header">
 
-<div>
-<ul class="post-copyright">
-  <li class="post-copyright-author">
-    <strong>本文作者： </strong>bad godd
-  </li>
-  <li class="post-copyright-link">
-    <strong>本文链接：</strong>
-    <a href="https://badgodd.github.io/2023/03/13/Young-GC%E8%BF%87%E4%BA%8E%E9%A2%91%E7%B9%81/" title="Young GC过于频繁">https://badgodd.github.io/2023/03/13/Young-GC过于频繁/</a>
-  </li>
-  <li class="post-copyright-license">
-    <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/zh-CN" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
-  </li>
-</ul>
-</div>
+      <div class="post-meta">
+        <time itemprop="dateCreated"
+              datetime="2023-06-11T21:18:09+08:00"
+              content="2023-06-11">
+          06-11
+        </time>
+      </div>
 
+      <div class="post-title">
+          <a class="post-title-link" href="/2023/06/11/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98FullGC/" itemprop="url">
+            <span itemprop="name">线上问题FullGC</span>
+          </a>
+      </div>
 
-      <footer class="post-footer">
-          <div class="post-tags">
-              <a href="/tags/GC/" rel="tag"># GC</a>
-          </div>
-
-        
-
-
-        
-    <div class="post-nav">
-      <div class="post-nav-item">
-    <a href="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/" rel="prev" title="双亲委派企业级应用">
-      <i class="fa fa-chevron-left"></i> 双亲委派企业级应用
-    </a></div>
-      <div class="post-nav-item">
-    <a href="/2023/05/13/ThreadLocal%E5%86%85%E5%AD%98%E6%B3%84%E9%9C%B2%E9%97%AE%E9%A2%98/" rel="next" title="ThreadLocal内存泄露问题">
-      ThreadLocal内存泄露问题 <i class="fa fa-chevron-right"></i>
-    </a></div>
-    </div>
-      </footer>
-    
+    </header>
   </article>
+
+    </div>
+  </div>
   
   
+  
+
   
 
 
@@ -377,7 +282,6 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%83%8C%E6%99%AF%E7%9F%A5%E8%AF%86-background"><span class="nav-number">1.</span> <span class="nav-text">背景知识 (background)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9F%A5%E7%9C%8B%E6%8C%87%E6%A0%87-dashboard"><span class="nav-number">2.</span> <span class="nav-text">查看指标 (dashboard)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%AD%A2%E6%8D%9F%E6%8E%AA%E6%96%BD-action"><span class="nav-number">3.</span> <span class="nav-text">止损措施 (action)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%AF%E8%83%BD%E7%9A%84%E5%8E%9F%E5%9B%A0-cause"><span class="nav-number">4.</span> <span class="nav-text">可能的原因 (cause)</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
