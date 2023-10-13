@@ -29,7 +29,7 @@ ThreadLocal有四个方法，分别为：
 
 
 
-ThreadLocal中用于保存线程的独有变量的数据结构是一个内部类：ThreadLocalMap，也是k-v结构。
+ThreadLocal当中用于保存线程的独有变量的数据结构是一个内部类：ThreadLocalMap，也是k-v结构。
 key就是当前的ThreadLoacal对象，而v就是我们想要保存的值。
 
 ![image-20231013144555156](ThreadLocal%E5%86%85%E5%AD%98%E6%B3%84%E9%9C%B2%E9%97%AE%E9%A2%98/image-20231013144555156.png)
