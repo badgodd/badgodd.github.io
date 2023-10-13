@@ -3,6 +3,7 @@ title: 线上问题FullGC
 date: 2023-06-11 21:18:09
 tags:
 - GC
+- 线上问题
 categories:
 - JVM
 ---
