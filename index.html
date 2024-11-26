@@ -191,6 +191,219 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2024/03/11/%E8%AF%BB%E5%86%99%E5%88%86%E7%A6%BB%E9%81%87%E5%88%B0%E4%B8%BB%E4%BB%8E%E5%BB%B6%E8%BF%9F%E6%80%8E%E4%B9%88%E5%8A%9E/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/touxiang.jpg">
+      <meta itemprop="name" content="bad godd">
+      <meta itemprop="description" content="无问东西">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Bad Godd's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2024/03/11/%E8%AF%BB%E5%86%99%E5%88%86%E7%A6%BB%E9%81%87%E5%88%B0%E4%B8%BB%E4%BB%8E%E5%BB%B6%E8%BF%9F%E6%80%8E%E4%B9%88%E5%8A%9E/" class="post-title-link" itemprop="url">读写分离遇到主从延迟怎么办</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2024-03-11 01:35:04" itemprop="dateCreated datePublished" datetime="2024-03-11T01:35:04+08:00">2024-03-11</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%AB%98%E6%80%A7%E8%83%BD/" itemprop="url" rel="index"><span itemprop="name">高性能</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>1.4k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>1 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>一般来说，为了减少主从延迟带来的影响，我们在实现读写分离时，可以采用以下几种方案做优化。</p>
+<h4 id="读请求分类"><a href="#读请求分类" class="headerlink" title="读请求分类"></a>读请求分类</h4><p>一般来说，虽然我们做了读写分离，但是也不是无脑分的，我们还会把读请求分成两类，一类是可以接受延迟的读，一类是不能接受延迟的读。</p>
+<p>比如历史订单的查询、比如数据报表的生成、比如数据对账的查询、比如非关键业务的查询，比如评论信息等，这些都是可以延迟的读，这些读的话就可以完全从备库走。</p>
+<p>而对于那些不能接受延迟的读，那么就需要注意了，就需要考虑进行强制读主库。</p>
+<p>这种方案其实是用的比较多的，不要以为他是逃避了问题，有的时候，没必要给自己创造困难硬上！</p>
+<h4 id="强制读主库"><a href="#强制读主库" class="headerlink" title="强制读主库"></a>强制读主库</h4><p>上面我们提到了对于一些不能接受延迟的读请求，需要强制走主库。</p>
+<p>还有一些情况，那就是一些核心的业务操作，或者是在一个事务上下文中的读请求，这时候也需要读主库的。</p>
+<p>比如说我在创建订单的过程中，我会先插入一个订单，然后再查询订单信息进行后续操作，这个过程中，是要保证数据一定能查到的，这时候就也需要强制走主库。</p>
+<p>具体如何实现强制读主库呢，如果是我们前面介绍的通过自己写代码分流的方案的话，就比较容易了，我们可以自己控制读写哪个数据源，那么就自己硬编码就好了。</p>
+<p>如果是使用我推荐的中间件的方案的话，比如ShardingJDBC，他也是支持强制路由的（<a target="_blank" rel="noopener" href="https://shardingsphere.apache.org/document/legacy/3.x/document/cn/manual/sharding-jdbc/usage/hint/">https://shardingsphere.apache.org/document/legacy/3.x/document/cn/manual/sharding-jdbc/usage/hint/</a> ），可以通过设置hint的方式让SQL只操作主库。</p>
+<h4 id="二次读取"><a href="#二次读取" class="headerlink" title="二次读取"></a>二次读取</h4><p>除了上面我们说的强制读主库的方案，还有一个常见做法叫做二次读取。</p>
+<p>啥意思呢，就是我的读取操作，默认读从库，但是如果我从库读取的时候没读到，那我为了避免因为数据延迟导致的，那么就再进行一次从主库读取。</p>
+<p>这个实现方式的话也是需要我们定制的开发代码。但是这个方案我不太建议，因为这种一旦出现延迟，也会导致你的主库会有大量的请求过去，造成很大的压力的。</p>
+<h4 id="主备一致"><a href="#主备一致" class="headerlink" title="主备一致"></a>主备一致</h4><p>除了上面说的方案之外，还有一些场景中，是采用了一些特殊的手段，来确保主备一致。</p>
+<p>比如在极客时间的《MySQL 45讲》中，作者提到过一些方案（但是其实用的都不多，还是前面说的几个方案更多一点）：</p>
+<p>Sleep方案：就是主库更新之后，读从库之前先sleep 1秒，然后再读从库。</p>
+<p>判断主备无延迟方案：每次从库执行查询请求前，先判断 seconds_behind_master 是否已经等于 0。如果还不等于 0 ，那就必须等到这个参数变为 0 才能执行查询请求。</p>
+<p>等主库位点方案：其核心思想是在从库上执行读操作前，确保从库已经同步了特定的主库位点（即主库的数据变更位置）。这样可以保证读操作获取的数据是最新的，避免了因主从复制延迟而导致的数据不一致问题。</p>
+<p>等 GTID 方案：和位点原理一样，MySQL 5.7.6 版本开始，允许在执行完更新类事务后，把这个事务的 GTID 返回给客户端，在执行读操作前，应用检查从库是否已经应用了该GTID标识的事务。这通常涉及查询从库的复制状态，确认已经处理的GTID集合包含了特定的GTID。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">GTID（Global Transaction Identifier）为每个事务提供了一个全局唯一的标识符，使得主从复制过程中的数据变更能够更加精确和容易追踪。</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2024/02/18/%E6%9C%8D%E5%8A%A1%E7%AB%AF%E6%8E%A5%E5%8F%A3%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E6%9C%89%E5%93%AA%E4%BA%9B%E6%96%B9%E6%A1%88/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/touxiang.jpg">
+      <meta itemprop="name" content="bad godd">
+      <meta itemprop="description" content="无问东西">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Bad Godd's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2024/02/18/%E6%9C%8D%E5%8A%A1%E7%AB%AF%E6%8E%A5%E5%8F%A3%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E6%9C%89%E5%93%AA%E4%BA%9B%E6%96%B9%E6%A1%88/" class="post-title-link" itemprop="url">服务端接口性能优化有哪些方案</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2024-02-18 23:28:42" itemprop="dateCreated datePublished" datetime="2024-02-18T23:28:42+08:00">2024-02-18</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%AB%98%E6%80%A7%E8%83%BD/" itemprop="url" rel="index"><span itemprop="name">高性能</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>3.4k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>3 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>​		作为一个Java后端开发，我们写出的大部分代码都决定着用户的使用体验。如果我们的后端代码性能不好，那么用户在访问我们的网站时就要浪费一些时间等待服务器的响应。这就可能导致用户投诉甚至用户的流失。</p>
+<p>​		关于性能优化是一个很大的话题。《Java程序性能优化》说性能优化包含五个层次：设计调优、代码调优、JVM调优、数据库调优、操作系统调优等。而每一个层次又包含很多方法论和最佳实践。本文不想大而广的概述这些内容。只是举几个常用的Java代码优化方案，读者看完之后可以真正的实践到自己代码中的方案。</p>
+<h4 id="使用单例"><a href="#使用单例" class="headerlink" title="使用单例"></a>使用单例</h4><p>对于IO处理、数据库连接、配置文件解析加载等一些非常耗费系统资源的操作,我们必须对这些实例的创建进行限制,或者是始终使用一个公用的实例,以节约系统开销,这种情况下就需要用到单例模式。</p>
+<h4 id="批量操作"><a href="#批量操作" class="headerlink" title="批量操作"></a>批量操作</h4><p>有100个请求，每个请求单独执行那肯定很慢，如果有办法把这个100个请求合并成一个请求，进行批量操作，那么效率就会高很多。</p>
+<p>尤其是数据库操作的时候，批量操作不仅比单条执行效率高，而且还能有效的降低数据库连接数，提升应用的QPS上限。</p>
+<h4 id="使用Future模式"><a href="#使用Future模式" class="headerlink" title="使用Future模式"></a>使用Future模式</h4><p>假设一个任务执行起来需要花费一些时间,为了省去不必要的等待时间,可以先获取一个“提货单”,即Future,然后继续处理别的任务,直到“货物”到达,即任务执行完得到结果,此时便可以用“提货单”进行提货,即通过Future对象得到返回值。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">RealData</span> <span class="keyword">implements</span> <span class="title class_">Callable</span>&lt;String&gt; &#123;  </span><br><span class="line">    <span class="keyword">protected</span> String data;  </span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="title function_">RealData</span><span class="params">(String data)</span> &#123;  </span><br><span class="line">        <span class="built_in">this</span>.data = data;  </span><br><span class="line">    &#125;  </span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span>  </span><br><span class="line">    <span class="keyword">public</span> String <span class="title function_">call</span><span class="params">()</span> <span class="keyword">throws</span> Exception &#123;  </span><br><span class="line">        <span class="comment">//利用sleep方法来表示真是业务是非常缓慢的  </span></span><br><span class="line">        <span class="keyword">try</span> &#123;  </span><br><span class="line">            Thread.sleep(<span class="number">1000</span>);  </span><br><span class="line">        &#125; <span class="keyword">catch</span> (InterruptedException e) &#123;  </span><br><span class="line">            e.printStackTrace();  </span><br><span class="line">        &#125;  </span><br><span class="line">        <span class="keyword">return</span> data;  </span><br><span class="line">    &#125;  </span><br><span class="line">&#125;  </span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">Application</span> &#123;  </span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> Exception &#123;  </span><br><span class="line">        FutureTask&lt;String&gt; futureTask =   </span><br><span class="line">                <span class="keyword">new</span> <span class="title class_">FutureTask</span>&lt;String&gt;(<span class="keyword">new</span> <span class="title class_">RealData</span>(<span class="string">&quot;name&quot;</span>));  </span><br><span class="line">        <span class="type">ExecutorService</span> <span class="variable">executor</span> <span class="operator">=</span>   </span><br><span class="line">                Executors.newFixedThreadPool(<span class="number">1</span>); <span class="comment">//使用线程池  </span></span><br><span class="line">        <span class="comment">//执行FutureTask，相当于上例中的client.request(&quot;name&quot;)发送请求  </span></span><br><span class="line">        executor.submit(futureTask);  </span><br><span class="line">        <span class="comment">//这里可以用一个sleep代替对其他业务逻辑的处理  </span></span><br><span class="line">        <span class="comment">//在处理这些业务逻辑过程中，RealData也正在创建，从而充分了利用等待时间  </span></span><br><span class="line">        Thread.sleep(<span class="number">2000</span>);  </span><br><span class="line">        <span class="comment">//使用真实数据  </span></span><br><span class="line">        <span class="comment">//如果call()没有执行完成依然会等待  </span></span><br><span class="line">        System.out.println(<span class="string">&quot;数据=&quot;</span> + futureTask.get());  </span><br><span class="line">    &#125;  </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<h4 id="使用线程池"><a href="#使用线程池" class="headerlink" title="使用线程池"></a>使用线程池</h4><p>合理利用线程池能够带来三个好处。第一：降低资源消耗。通过重复利用已创建的线程降低线程创建和销毁造成的消耗。第二：提高响应速度。当任务到达时，任务可以不需要等到线程创建就能立即执行。第三：提高线程的可管理性。线程是稀缺资源，如果无限制的创建，不仅会消耗系统资源，还会降低系统的稳定性，使用线程池可以进行统一的分配，调优和监控。</p>
+<p>在 Java 5 之后，并发编程引入了一堆新的启动、调度和管理线程的API。Executor 框架便是 Java 5 中引入的，其内部使用了线程池机制，它在 java.util.cocurrent 包下，通过该框架来控制线程的启动、执行和关闭，可以简化并发编程的操作。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">MultiThreadTest</span> &#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> &#123;</span><br><span class="line">        <span class="type">ThreadFactory</span> <span class="variable">threadFactory</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">ThreadFactoryBuilder</span>().setNameFormat(<span class="string">&quot;thread-%d&quot;</span>).build();</span><br><span class="line">        <span class="type">ExecutorService</span> <span class="variable">executor</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">ThreadPoolExecutor</span>(<span class="number">2</span>, <span class="number">5</span>, <span class="number">60L</span>, TimeUnit.SECONDS, <span class="keyword">new</span> <span class="title class_">LinkedBlockingQueue</span>&lt;Runnable&gt;(), threadFactory);</span><br><span class="line">        executor.execute(<span class="keyword">new</span> <span class="title class_">Runnable</span>() &#123;</span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">run</span><span class="params">()</span> &#123;</span><br><span class="line">               System.out.println(<span class="string">&quot;hello world !&quot;</span>);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;);</span><br><span class="line">        System.out.println(<span class="string">&quot; ===&gt; main Thread! &quot;</span> );</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<h4 id="使用NIO"><a href="#使用NIO" class="headerlink" title="使用NIO"></a>使用NIO</h4><p>JDK自1.4起开始提供全新的I&#x2F;O编程类库,简称NIO,其不但引入了全新高效的Buffer和Channel,同时,还引入了基于Selector的非阻塞 I&#x2F;O机制,将多个异步的I&#x2F;O操作集中到一个或几个线程当中进行处理,使用NIO代替阻塞I&#x2F;O能提高程序的并发吞吐能力,降低系统的开销。</p>
+<p>对于每一个请求,如果单独开一个线程进行相应的逻辑处理,当客户端的数据传递并不是一直进行,而是断断续续的,则相应的线程需要 I&#x2F;O等待,并进行上下文切换。而使用NIO引入的Selector机制后,可以提升程序的并发效率,改善这一状况。</p>
+<h4 id="锁优化"><a href="#锁优化" class="headerlink" title="锁优化"></a>锁优化</h4><p>在并发场景中，我们的代码中经常会用到锁。存在锁，就必然存在锁的竞争，存在锁的竞争，就会消耗很多资源。那么，如何优化我们Java代码中的锁呢？主要可以从以下几个方面考虑：</p>
+<p>●减少锁持有时间 </p>
+<p>可以使用同步代码块来代替同步方法。这样可以减少锁持有的时间。</p>
+<p>●减少锁粒度 </p>
+<p>要在并发场景中使用Map的时候，记得使用ConcurrentHashMap来代替HashTable和HashMap。（CHM采用分段锁，锁的粒度会更小）</p>
+<p>●锁分离 </p>
+<p>普通锁（如syncronized）会导致读阻塞写、写也会阻塞读，同时读读与写写之间也会进行阻塞，可以想办法将读操作和写操作分离开。</p>
+<p>●锁粗化 </p>
+<p>有些情况下我们希望把很多次锁的请求合并成一个请求，以降低短时间内大量锁请求、同步、释放带来的性能损耗。</p>
+<p>●锁消除 </p>
+<p>锁消除是Java虚拟机在JIT编译是，通过对运行上下文的扫描，去除不可能存在共享资源竞争的锁，通过锁消除，可以节省毫无意义的请求锁时间。</p>
+<p>关于锁优化的内容，后面会出一篇文章详细介绍。</p>
+<h4 id="压缩传输"><a href="#压缩传输" class="headerlink" title="压缩传输"></a>压缩传输</h4><p>在进行数据传输之前,可以先将数据进行压缩,以减少网络传输的字节数,提升数据传输的速度,接收端可以将数据进行解压,以还原出传递的数据,并且,经过压缩的数据还可以节约所耗费的存储介质(磁盘或内存)的空间以及网络带宽,降低成本。当然,压缩也并不是没有开销的,数据压缩需要大量的CPU计算,并且,根据压缩算法的不同,计算的复杂度以及数据的压缩比也存在较大差异。一般情况下,需要根据不同的业务场景,选择不同的压缩算法。</p>
+<h4 id="缓存结果"><a href="#缓存结果" class="headerlink" title="缓存结果"></a>缓存结果</h4><p>对于相同的用户请求,如果每次都重复的查询数据库,重复的进行计算,将浪费很多的时间和资源。将计算后的结果缓存到本地内存,或者是通过分布式缓存来进行结果的缓存,可以节约宝贵的CPU计算资源,减少重复的数据库查询或者是磁盘I&#x2F;O,将原本磁头的物理转动变成内存的电子运动,提高响应速度,并且线程的迅速释放也使得应用的吞吐能力得到提升。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2023/12/17/Redisson%E7%9A%84watchdog%E6%9C%BA%E5%88%B6%E6%98%AF%E6%80%8E%E4%B9%88%E6%A0%B7%E7%9A%84%EF%BC%9F/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -975,255 +1188,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/touxiang.jpg">
-      <meta itemprop="name" content="bad godd">
-      <meta itemprop="description" content="无问东西">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Bad Godd's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/" class="post-title-link" itemprop="url">双亲委派企业级应用</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-01-10 21:29:44" itemprop="dateCreated datePublished" datetime="2022-01-10T21:29:44+08:00">2022-01-10</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/JVM/" itemprop="url" rel="index"><span itemprop="name">JVM</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>1.7k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>2 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h1 id="JDBC-SPI"><a href="#JDBC-SPI" class="headerlink" title="JDBC-SPI"></a>JDBC-SPI</h1><h2 id="打破背景"><a href="#打破背景" class="headerlink" title="打破背景"></a>打破背景</h2><p>为了更加灵活的连接数据库，我们的JDK定义了<code>Driver</code>接口，需要与数据库进行连接的包必须实现该接口。例如：MySQL，建议去观察下项目中<code>mysql-connector</code>包，下面就有实现类的全限定类名。  </p>
-<p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011142644308-1697011108741.png" alt="image-20231011142644308"></p>
-<h2 id="打破原因"><a href="#打破原因" class="headerlink" title="打破原因"></a>打破原因</h2><p>在上述背景下，执行 <code>DriverManager</code>类的方法时，需要去加载实现类。还记得我们第一篇文章讲的 <code>BootStrapClassLoader</code>吗，它只能加载<code>rt.jar</code>下的类。而MySQL的加载路径隶属于<code>AppClassLoader</code>,所以理论上它压根就不能被加载。</p>
-<p>于是线程上下文类加载器就应运而生，由于<code>ThreadClassLoader</code>一般情况下&#x3D;&#x3D;<code>AppClassLoader</code>。于是通过线程上下文类加载器加载JDBC实现类，打破了双亲委派模型，顺利实现功能。</p>
-<h2 id="源码解读"><a href="#源码解读" class="headerlink" title="源码解读"></a>源码解读</h2><ol>
-<li><p>查看DriverManager类 </p>
-<p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011142230230-1697011108742.png" alt="image-20231011142230230"></p>
-</li>
-<li><p>获取线程上下文加载器，一般是AppClassLoder，并且Set到ServiceLoader中 </p>
-</li>
-<li><p>通过迭代器迭代<img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011142323580-1697011108742.png" alt="image-20231011142323580"></p>
-</li>
-<li><p>获取实现类路径配置 &#x3D; “META-INF&#x2F;services&#x2F;“ + service.name; </p>
-<p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011142340932-1697011108742.png" alt="image-20231011142340932"></p>
-</li>
-<li><p>加载实现类 </p>
-<p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011142704289-1697011108742.png" alt="image-20231011142704289"></p>
-</li>
-</ol>
-<h2 id="不足"><a href="#不足" class="headerlink" title="不足"></a>不足</h2><p>ServiceLoader只提供了遍历的方式来获取目标实现类，假如有多个JDBC实现类，都会去加载，没有提供按需加载的方法。像<code>Dubbo SPI</code>就提供了可配置化的加载.</p>
-<h1 id="Tomcat"><a href="#Tomcat" class="headerlink" title="Tomcat"></a>Tomcat</h1><h2 id="打破背景-1"><a href="#打破背景-1" class="headerlink" title="打破背景"></a>打破背景</h2><p>Tomcat能将多个WebApp应用在一个容器内启动。</p>
-<h2 id="打破原因-1"><a href="#打破原因-1" class="headerlink" title="打破原因"></a>打破原因</h2><ol>
-<li>Tomcat下有多个WebApp,但它只有一个JVM。不同的WebApp可能会依赖同一个第三方类库的不同版本，因此要保证每个应用程序的类库都是独立的，保证相互隔离。</li>
-<li>部署在同一个Tomcat容器中相同的类库相同的版本可以共享。否则，如果服务器有10个应用程序，那么要有10份相同的类库加载进虚拟机。</li>
-<li>web容器也有自己依赖的类库，不能于应用程序的类库混淆。基于安全考虑，应该让容器的类库和程序的类库隔离开来。 总结：有些共用类只需要一份，有些类只需要多份隔离。</li>
-</ol>
-<h2 id="实现方式"><a href="#实现方式" class="headerlink" title="实现方式"></a>实现方式</h2><p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231010110449075-1697009246437-1697011108742.png" alt="image-20231010110449075"></p>
-<ol>
-<li>Webapp 应用类加载器每个应用在部署后，都会创建一个唯一的类加载器。该类加载器会加载位于 WEB-INF&#x2F;lib下的jar文件中的class 和 WEB-INF&#x2F;classes下的class文件。</li>
-<li>通过<code>Common ClassLoader</code>加载通用的类。</li>
-<li>通过 <code>Catalina ClassLoader</code> 加载Tomcat自身需要的类。</li>
-</ol>
-<h1 id="SpringBoot"><a href="#SpringBoot" class="headerlink" title="SpringBoot"></a>SpringBoot</h1><h2 id="打破背景-2"><a href="#打破背景-2" class="headerlink" title="打破背景"></a>打破背景</h2><p><code>SpringBoot</code>为了jar包结构的简洁,创建了与普通jar包不一样的包格式</p>
-<h2 id="打破原因-2"><a href="#打破原因-2" class="headerlink" title="打破原因"></a>打破原因</h2><p>jar文件规范中，一个jar文件如果要运行必须将入口类放置到jar文件的顶层目录，这样才能被正确的加载。</p>
-<h2 id="查看源码方法"><a href="#查看源码方法" class="headerlink" title="查看源码方法"></a>查看源码方法</h2><p>单纯的SpringBoot项目你找不到启动类的，看这个链接:<a href="https://link.juejin.cn/?target=https://www.cnblogs.com/fengpinglangjingruma/p/13916297.html">点它 </a>。</p>
-<h2 id="实现方式-1"><a href="#实现方式-1" class="headerlink" title="实现方式"></a>实现方式</h2><ol>
-<li><p>当<code>java -jar xxx</code>时，会去调用<code>JarLauncher.launch()</code>方法。</p>
-</li>
-<li><p>获取需要加载的类和包并作为参数传递到LauncherURLClassLoader </p>
-</li>
-<li><p>创建类加载器 </p>
-</li>
-<li><p>获取启动类, 可以看到在我们的项目中Start-Class &#x3D; “Application.class” </p>
-<p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011153254352-1697011108742.png" alt="image-20231011153254352"> </p>
-</li>
-<li><p>通过自定义加载器加载类，并且反射调用 <code>Start-Class</code>的<code>main</code>方法启动项目。 </p>
-<p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011153237491-1697011108742.png" alt="image-20231011153237491"></p>
-</li>
-</ol>
-<h1 id="热加载"><a href="#热加载" class="headerlink" title="热加载"></a>热加载</h1><h2 id="打破背景-3"><a href="#打破背景-3" class="headerlink" title="打破背景"></a>打破背景</h2><p>早期的项目，如果修改了代码之后，需要重启项目才能使代码正确运行。</p>
-<h2 id="打破原因-3"><a href="#打破原因-3" class="headerlink" title="打破原因"></a>打破原因</h2><p>为了让代码修改后能够快速响应，需要通过热加载的形式，动态发现修改的类，并且使用自定义类加载器快速加载变化的类。</p>
-<h2 id="实现方式-2"><a href="#实现方式-2" class="headerlink" title="实现方式"></a>实现方式</h2><p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011162414744.png" alt="image-20231011162414744"></p>
-<h1 id="Jar包冲突"><a href="#Jar包冲突" class="headerlink" title="Jar包冲突"></a>Jar包冲突</h1><h2 id="打破背景-4"><a href="#打破背景-4" class="headerlink" title="打破背景"></a>打破背景</h2><p>项目中经常出现jar包冲突导致抛出异常，不是NoSuchMethod,NoClassDefund。</p>
-<h2 id="打破原因-4"><a href="#打破原因-4" class="headerlink" title="打破原因"></a>打破原因</h2><p>Jar包冲突的原因是使用了C2类的方法, 但JVM却加载了C1类。可以让相同包名的包由不同的类加载器加载，进行隔离，避免jar包冲突。</p>
-<h2 id="实现方式-3"><a href="#实现方式-3" class="headerlink" title="实现方式"></a>实现方式</h2><ol>
-<li><p>通过自定义类加载器，为每个中间件自定义一个加载器，这些加载器之间的关系是平行的，彼此没有依赖关系。</p>
-</li>
-<li><p>这样每个中间件的classloader就可以加载各自版本的包。因为一个类的全限定名以及加载该类的加载器两者共同形成了这个类在JVM中的惟一标识。</p>
-</li>
-</ol>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2022/01/03/git%E4%BD%BF%E7%94%A8%E4%B8%AD-error-pathspec-%E2%80%98xxx%E2%80%98-did-not-match-any-file-s-known-to-git-%E6%8A%A5%E9%94%99%E8%A7%A3%E5%86%B3%E6%96%B9%E6%B3%95/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/touxiang.jpg">
-      <meta itemprop="name" content="bad godd">
-      <meta itemprop="description" content="无问东西">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Bad Godd's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/01/03/git%E4%BD%BF%E7%94%A8%E4%B8%AD-error-pathspec-%E2%80%98xxx%E2%80%98-did-not-match-any-file-s-known-to-git-%E6%8A%A5%E9%94%99%E8%A7%A3%E5%86%B3%E6%96%B9%E6%B3%95/" class="post-title-link" itemprop="url">git使用中 error: pathspec ‘xxx‘ did not match any file(s) known to git 报错解决方法</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-01-03 20:11:04" itemprop="dateCreated datePublished" datetime="2022-01-03T20:11:04+08:00">2022-01-03</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Git/" itemprop="url" rel="index"><span itemprop="name">Git</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>1.2k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="一、问题描述"><a href="#一、问题描述" class="headerlink" title="一、问题描述"></a>一、问题描述</h2><p>项目上想合并代码，以自己的分支master作为主分支，要合并分支study，结果<br>在 git merge study 的时候报如下错误<br>其实在 git checkout 的时候也会出现这个错误</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">error: pathspec &#x27;origin/XXX&#x27; did not match any file(s) known to git.</span><br><span class="line">发现是本地git没有识别到远程git仓库的分支</span><br></pre></td></tr></table></figure>
-
-<h2 id="二、解决办法"><a href="#二、解决办法" class="headerlink" title="二、解决办法"></a>二、解决办法</h2><p>1、首先看下所有分支 是否有新分支</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git branch -a</span><br></pre></td></tr></table></figure>
-
-<p>2、如果没看到，那么执行以下操作，这步是获取所有分支</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git fetch</span><br></pre></td></tr></table></figure>
-
-
-<p>执行完会看到这样提示</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">remote: Enumerating objects: 4, done.</span><br><span class="line">remote: Counting objects: 100% (4/4), done.</span><br><span class="line">Unpacking objects: 100% (4/4), 1.06 KiB | 90.00 KiB/s, done.</span><br><span class="line">From codeup.aliyun.com:5eeb0689892c58bb7c394ab5/pxb/pxb-fronted</span><br><span class="line"> * [new branch]      XXX -&gt; origin/XXX</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-
-
-<p>3、切换到远程分支:</p>
-<p>git checkout origin&#x2F;xxx</p>
-<p>提示：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">Note: switching to &#x27;origin/xxx&#x27;.</span><br><span class="line"></span><br><span class="line">You are in &#x27;detached HEAD&#x27; state. You can look around, make experimental</span><br><span class="line">changes and commit them, and you can discard any commits you make in this</span><br><span class="line">state without impacting any branches by switching back to a branch.</span><br><span class="line"></span><br><span class="line">If you want to create a new branch to retain commits you create, you may</span><br><span class="line">do so (now or later) by using -c with the switch command. Example:</span><br><span class="line"></span><br><span class="line">  git switch -c &lt;new-branch-name&gt;</span><br><span class="line"></span><br><span class="line">Or undo this operation with:</span><br><span class="line"></span><br><span class="line">  git switch -</span><br><span class="line"></span><br><span class="line">Turn off this advice by setting config variable advice.detachedHead to false</span><br><span class="line"></span><br><span class="line">HEAD is now at dc877cd XXX</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-<p>4、现在可以看到自己的分支是一串数字字母，这时新建并切换到分支</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git checkout -b xxx</span><br></pre></td></tr></table></figure>
-
-<p>5、现在需要跟远程的分支进行关联</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git branch -u origin/xxx</span><br></pre></td></tr></table></figure>
-
-<p>6、这时我们执行git pull来看看什么反馈:</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Already up-to-date.</span><br></pre></td></tr></table></figure>
-
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1295,14 +1259,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">11</span>
+          <span class="site-state-item-count">13</span>
           <span class="site-state-item-name">博客</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">3</span>
+        <span class="site-state-item-count">4</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">

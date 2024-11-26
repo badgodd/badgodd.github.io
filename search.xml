@@ -171,6 +171,27 @@
       </tags>
   </entry>
   <entry>
+    <title>使用CompletableFuture完成并发编排，提升接口性能</title>
+    <url>/2023/07/26/%E4%BD%BF%E7%94%A8CompletableFuture%E5%AE%8C%E6%88%90%E5%B9%B6%E5%8F%91%E7%BC%96%E6%8E%92%EF%BC%8C%E6%8F%90%E5%8D%87%E6%8E%A5%E5%8F%A3%E6%80%A7%E8%83%BD/</url>
+    <content><![CDATA[<h4 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h4><p>我的项目中，有这样一个场景，我们要发起一个用户主动还款之后，需要把在途的扣款单全部暂停，但是因为用户选择还款单据可能比较多，而且暂停是调用外部资金打款系统的接口实现的，这个地方如果一条一条执行就很慢，但是如果起多线程执行的话，我就没办法知道他们每一个暂定的返回结果。</p>
+<p>我想可以实现一个这样的功能：多线程去执行暂停动作，如果都成功了，那么就推进我的主动扣款后续流程，如果暂停有任何一个接口调用失败了，那么先不推进后续流程，等下次重试。</p>
+<p> 技术选型 </p>
+<p>为了实现这个功能，我了解到CompletableFuture，他是Java 8中引入的一个新特性，它提供了一种简单的方法来实现异步编程和任务组合。</p>
+<p>他的多线程编排的能力刚好可以用在我这个场景中，而且他底层是基于ForkJoinPool实现的，所以他的性能也比较高效，所以最终我选择了这个方案。</p>
+<h4 id="具体实现"><a href="#具体实现" class="headerlink" title="具体实现"></a>具体实现</h4><figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="comment">//异步暂停扣款</span></span><br><span class="line">CompletableFuture&lt;Void&gt; allFutures = CompletableFuture.allOf(noticeDetails.stream()</span><br><span class="line">        .map(detail -&gt; CompletableFuture.supplyAsync(() -&gt; &#123;</span><br><span class="line">            pause(detail);</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">        &#125;)).toArray(CompletableFuture[]::<span class="keyword">new</span>));</span><br><span class="line"></span><br><span class="line"><span class="comment">//所有暂停扣款成功后，更新代还通知单</span></span><br><span class="line">allFutures.whenComplete((v, e) -&gt; &#123;</span><br><span class="line">    <span class="keyword">if</span> (e == <span class="literal">null</span>) &#123;</span><br><span class="line">        <span class="comment">//执行后续的还款操作</span></span><br><span class="line">        <span class="comment">//...</span></span><br><span class="line">        <span class="comment">//...</span></span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        log.error(<span class="string">&quot;notice failed&quot;</span>, e);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+
+
+<h4 id="得到结果"><a href="#得到结果" class="headerlink" title="得到结果"></a>得到结果</h4><p>在用了CompletableFuture做编排之前，原来50笔订单的暂停扣款，需要大概10s左右，但是用了CompletableFuture之后，50笔订单的暂停扣款只需要1秒钟左右。</p>
+]]></content>
+      <categories>
+        <category>JUC</category>
+      </categories>
+      <tags>
+        <tag>多线程</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>如何基于Redis实现滑动窗口限流</title>
     <url>/2023/11/02/%E5%A6%82%E4%BD%95%E5%9F%BA%E4%BA%8ERedis%E5%AE%9E%E7%8E%B0%E6%BB%91%E5%8A%A8%E7%AA%97%E5%8F%A3%E9%99%90%E6%B5%81/</url>
     <content><![CDATA[<p>​		滑动窗口限流是一种流量控制策略，用于控制在一定时间内允许执行的操作数量或请求频率。它的工作方式类似于一个滑动时间窗口，在窗口内允许的操作数量是固定的，窗口会随着时间的推移不断滑动。</p>
@@ -192,27 +213,6 @@
 ]]></content>
       <tags>
         <tag>Redis</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>使用CompletableFuture完成并发编排，提升接口性能</title>
-    <url>/2023/07/26/%E4%BD%BF%E7%94%A8CompletableFuture%E5%AE%8C%E6%88%90%E5%B9%B6%E5%8F%91%E7%BC%96%E6%8E%92%EF%BC%8C%E6%8F%90%E5%8D%87%E6%8E%A5%E5%8F%A3%E6%80%A7%E8%83%BD/</url>
-    <content><![CDATA[<h4 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h4><p>我的项目中，有这样一个场景，我们要发起一个用户主动还款之后，需要把在途的扣款单全部暂停，但是因为用户选择还款单据可能比较多，而且暂停是调用外部资金打款系统的接口实现的，这个地方如果一条一条执行就很慢，但是如果起多线程执行的话，我就没办法知道他们每一个暂定的返回结果。</p>
-<p>我想可以实现一个这样的功能：多线程去执行暂停动作，如果都成功了，那么就推进我的主动扣款后续流程，如果暂停有任何一个接口调用失败了，那么先不推进后续流程，等下次重试。</p>
-<p> 技术选型 </p>
-<p>为了实现这个功能，我了解到CompletableFuture，他是Java 8中引入的一个新特性，它提供了一种简单的方法来实现异步编程和任务组合。</p>
-<p>他的多线程编排的能力刚好可以用在我这个场景中，而且他底层是基于ForkJoinPool实现的，所以他的性能也比较高效，所以最终我选择了这个方案。</p>
-<h4 id="具体实现"><a href="#具体实现" class="headerlink" title="具体实现"></a>具体实现</h4><figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="comment">//异步暂停扣款</span></span><br><span class="line">CompletableFuture&lt;Void&gt; allFutures = CompletableFuture.allOf(noticeDetails.stream()</span><br><span class="line">        .map(detail -&gt; CompletableFuture.supplyAsync(() -&gt; &#123;</span><br><span class="line">            pause(detail);</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">        &#125;)).toArray(CompletableFuture[]::<span class="keyword">new</span>));</span><br><span class="line"></span><br><span class="line"><span class="comment">//所有暂停扣款成功后，更新代还通知单</span></span><br><span class="line">allFutures.whenComplete((v, e) -&gt; &#123;</span><br><span class="line">    <span class="keyword">if</span> (e == <span class="literal">null</span>) &#123;</span><br><span class="line">        <span class="comment">//执行后续的还款操作</span></span><br><span class="line">        <span class="comment">//...</span></span><br><span class="line">        <span class="comment">//...</span></span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        log.error(<span class="string">&quot;notice failed&quot;</span>, e);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
-
-
-
-<h4 id="得到结果"><a href="#得到结果" class="headerlink" title="得到结果"></a>得到结果</h4><p>在用了CompletableFuture做编排之前，原来50笔订单的暂停扣款，需要大概10s左右，但是用了CompletableFuture之后，50笔订单的暂停扣款只需要1秒钟左右。</p>
-]]></content>
-      <categories>
-        <category>JUC</category>
-      </categories>
-      <tags>
-        <tag>多线程</tag>
       </tags>
   </entry>
   <entry>
@@ -311,6 +311,46 @@
       </tags>
   </entry>
   <entry>
+    <title>服务端接口性能优化有哪些方案</title>
+    <url>/2024/02/18/%E6%9C%8D%E5%8A%A1%E7%AB%AF%E6%8E%A5%E5%8F%A3%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E6%9C%89%E5%93%AA%E4%BA%9B%E6%96%B9%E6%A1%88/</url>
+    <content><![CDATA[<p>​		作为一个Java后端开发，我们写出的大部分代码都决定着用户的使用体验。如果我们的后端代码性能不好，那么用户在访问我们的网站时就要浪费一些时间等待服务器的响应。这就可能导致用户投诉甚至用户的流失。</p>
+<p>​		关于性能优化是一个很大的话题。《Java程序性能优化》说性能优化包含五个层次：设计调优、代码调优、JVM调优、数据库调优、操作系统调优等。而每一个层次又包含很多方法论和最佳实践。本文不想大而广的概述这些内容。只是举几个常用的Java代码优化方案，读者看完之后可以真正的实践到自己代码中的方案。</p>
+<h4 id="使用单例"><a href="#使用单例" class="headerlink" title="使用单例"></a>使用单例</h4><p>对于IO处理、数据库连接、配置文件解析加载等一些非常耗费系统资源的操作,我们必须对这些实例的创建进行限制,或者是始终使用一个公用的实例,以节约系统开销,这种情况下就需要用到单例模式。</p>
+<h4 id="批量操作"><a href="#批量操作" class="headerlink" title="批量操作"></a>批量操作</h4><p>有100个请求，每个请求单独执行那肯定很慢，如果有办法把这个100个请求合并成一个请求，进行批量操作，那么效率就会高很多。</p>
+<p>尤其是数据库操作的时候，批量操作不仅比单条执行效率高，而且还能有效的降低数据库连接数，提升应用的QPS上限。</p>
+<h4 id="使用Future模式"><a href="#使用Future模式" class="headerlink" title="使用Future模式"></a>使用Future模式</h4><p>假设一个任务执行起来需要花费一些时间,为了省去不必要的等待时间,可以先获取一个“提货单”,即Future,然后继续处理别的任务,直到“货物”到达,即任务执行完得到结果,此时便可以用“提货单”进行提货,即通过Future对象得到返回值。</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">RealData</span> <span class="keyword">implements</span> <span class="title class_">Callable</span>&lt;String&gt; &#123;  </span><br><span class="line">    <span class="keyword">protected</span> String data;  </span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="title function_">RealData</span><span class="params">(String data)</span> &#123;  </span><br><span class="line">        <span class="built_in">this</span>.data = data;  </span><br><span class="line">    &#125;  </span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span>  </span><br><span class="line">    <span class="keyword">public</span> String <span class="title function_">call</span><span class="params">()</span> <span class="keyword">throws</span> Exception &#123;  </span><br><span class="line">        <span class="comment">//利用sleep方法来表示真是业务是非常缓慢的  </span></span><br><span class="line">        <span class="keyword">try</span> &#123;  </span><br><span class="line">            Thread.sleep(<span class="number">1000</span>);  </span><br><span class="line">        &#125; <span class="keyword">catch</span> (InterruptedException e) &#123;  </span><br><span class="line">            e.printStackTrace();  </span><br><span class="line">        &#125;  </span><br><span class="line">        <span class="keyword">return</span> data;  </span><br><span class="line">    &#125;  </span><br><span class="line">&#125;  </span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">Application</span> &#123;  </span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> Exception &#123;  </span><br><span class="line">        FutureTask&lt;String&gt; futureTask =   </span><br><span class="line">                <span class="keyword">new</span> <span class="title class_">FutureTask</span>&lt;String&gt;(<span class="keyword">new</span> <span class="title class_">RealData</span>(<span class="string">&quot;name&quot;</span>));  </span><br><span class="line">        <span class="type">ExecutorService</span> <span class="variable">executor</span> <span class="operator">=</span>   </span><br><span class="line">                Executors.newFixedThreadPool(<span class="number">1</span>); <span class="comment">//使用线程池  </span></span><br><span class="line">        <span class="comment">//执行FutureTask，相当于上例中的client.request(&quot;name&quot;)发送请求  </span></span><br><span class="line">        executor.submit(futureTask);  </span><br><span class="line">        <span class="comment">//这里可以用一个sleep代替对其他业务逻辑的处理  </span></span><br><span class="line">        <span class="comment">//在处理这些业务逻辑过程中，RealData也正在创建，从而充分了利用等待时间  </span></span><br><span class="line">        Thread.sleep(<span class="number">2000</span>);  </span><br><span class="line">        <span class="comment">//使用真实数据  </span></span><br><span class="line">        <span class="comment">//如果call()没有执行完成依然会等待  </span></span><br><span class="line">        System.out.println(<span class="string">&quot;数据=&quot;</span> + futureTask.get());  </span><br><span class="line">    &#125;  </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<h4 id="使用线程池"><a href="#使用线程池" class="headerlink" title="使用线程池"></a>使用线程池</h4><p>合理利用线程池能够带来三个好处。第一：降低资源消耗。通过重复利用已创建的线程降低线程创建和销毁造成的消耗。第二：提高响应速度。当任务到达时，任务可以不需要等到线程创建就能立即执行。第三：提高线程的可管理性。线程是稀缺资源，如果无限制的创建，不仅会消耗系统资源，还会降低系统的稳定性，使用线程池可以进行统一的分配，调优和监控。</p>
+<p>在 Java 5 之后，并发编程引入了一堆新的启动、调度和管理线程的API。Executor 框架便是 Java 5 中引入的，其内部使用了线程池机制，它在 java.util.cocurrent 包下，通过该框架来控制线程的启动、执行和关闭，可以简化并发编程的操作。</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">MultiThreadTest</span> &#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> &#123;</span><br><span class="line">        <span class="type">ThreadFactory</span> <span class="variable">threadFactory</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">ThreadFactoryBuilder</span>().setNameFormat(<span class="string">&quot;thread-%d&quot;</span>).build();</span><br><span class="line">        <span class="type">ExecutorService</span> <span class="variable">executor</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">ThreadPoolExecutor</span>(<span class="number">2</span>, <span class="number">5</span>, <span class="number">60L</span>, TimeUnit.SECONDS, <span class="keyword">new</span> <span class="title class_">LinkedBlockingQueue</span>&lt;Runnable&gt;(), threadFactory);</span><br><span class="line">        executor.execute(<span class="keyword">new</span> <span class="title class_">Runnable</span>() &#123;</span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">run</span><span class="params">()</span> &#123;</span><br><span class="line">               System.out.println(<span class="string">&quot;hello world !&quot;</span>);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;);</span><br><span class="line">        System.out.println(<span class="string">&quot; ===&gt; main Thread! &quot;</span> );</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<h4 id="使用NIO"><a href="#使用NIO" class="headerlink" title="使用NIO"></a>使用NIO</h4><p>JDK自1.4起开始提供全新的I&#x2F;O编程类库,简称NIO,其不但引入了全新高效的Buffer和Channel,同时,还引入了基于Selector的非阻塞 I&#x2F;O机制,将多个异步的I&#x2F;O操作集中到一个或几个线程当中进行处理,使用NIO代替阻塞I&#x2F;O能提高程序的并发吞吐能力,降低系统的开销。</p>
+<p>对于每一个请求,如果单独开一个线程进行相应的逻辑处理,当客户端的数据传递并不是一直进行,而是断断续续的,则相应的线程需要 I&#x2F;O等待,并进行上下文切换。而使用NIO引入的Selector机制后,可以提升程序的并发效率,改善这一状况。</p>
+<h4 id="锁优化"><a href="#锁优化" class="headerlink" title="锁优化"></a>锁优化</h4><p>在并发场景中，我们的代码中经常会用到锁。存在锁，就必然存在锁的竞争，存在锁的竞争，就会消耗很多资源。那么，如何优化我们Java代码中的锁呢？主要可以从以下几个方面考虑：</p>
+<p>●减少锁持有时间 </p>
+<p>可以使用同步代码块来代替同步方法。这样可以减少锁持有的时间。</p>
+<p>●减少锁粒度 </p>
+<p>要在并发场景中使用Map的时候，记得使用ConcurrentHashMap来代替HashTable和HashMap。（CHM采用分段锁，锁的粒度会更小）</p>
+<p>●锁分离 </p>
+<p>普通锁（如syncronized）会导致读阻塞写、写也会阻塞读，同时读读与写写之间也会进行阻塞，可以想办法将读操作和写操作分离开。</p>
+<p>●锁粗化 </p>
+<p>有些情况下我们希望把很多次锁的请求合并成一个请求，以降低短时间内大量锁请求、同步、释放带来的性能损耗。</p>
+<p>●锁消除 </p>
+<p>锁消除是Java虚拟机在JIT编译是，通过对运行上下文的扫描，去除不可能存在共享资源竞争的锁，通过锁消除，可以节省毫无意义的请求锁时间。</p>
+<p>关于锁优化的内容，后面会出一篇文章详细介绍。</p>
+<h4 id="压缩传输"><a href="#压缩传输" class="headerlink" title="压缩传输"></a>压缩传输</h4><p>在进行数据传输之前,可以先将数据进行压缩,以减少网络传输的字节数,提升数据传输的速度,接收端可以将数据进行解压,以还原出传递的数据,并且,经过压缩的数据还可以节约所耗费的存储介质(磁盘或内存)的空间以及网络带宽,降低成本。当然,压缩也并不是没有开销的,数据压缩需要大量的CPU计算,并且,根据压缩算法的不同,计算的复杂度以及数据的压缩比也存在较大差异。一般情况下,需要根据不同的业务场景,选择不同的压缩算法。</p>
+<h4 id="缓存结果"><a href="#缓存结果" class="headerlink" title="缓存结果"></a>缓存结果</h4><p>对于相同的用户请求,如果每次都重复的查询数据库,重复的进行计算,将浪费很多的时间和资源。将计算后的结果缓存到本地内存,或者是通过分布式缓存来进行结果的缓存,可以节约宝贵的CPU计算资源,减少重复的数据库查询或者是磁盘I&#x2F;O,将原本磁头的物理转动变成内存的电子运动,提高响应速度,并且线程的迅速释放也使得应用的吞吐能力得到提升。</p>
+]]></content>
+      <categories>
+        <category>高性能</category>
+      </categories>
+  </entry>
+  <entry>
     <title>线上问题FullGC</title>
     <url>/2023/06/11/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98FullGC/</url>
     <content><![CDATA[<h2 id="背景知识-background"><a href="#背景知识-background" class="headerlink" title="背景知识 (background)"></a>背景知识 (background)</h2><p>​	FullGC通常伴随着比较久的停顿和性能退化，不过不同GC算法关注点不一样。</p>
@@ -379,5 +419,34 @@
       <tags>
         <tag>Hexo</tag>
       </tags>
+  </entry>
+  <entry>
+    <title>读写分离遇到主从延迟怎么办</title>
+    <url>/2024/03/11/%E8%AF%BB%E5%86%99%E5%88%86%E7%A6%BB%E9%81%87%E5%88%B0%E4%B8%BB%E4%BB%8E%E5%BB%B6%E8%BF%9F%E6%80%8E%E4%B9%88%E5%8A%9E/</url>
+    <content><![CDATA[<p>一般来说，为了减少主从延迟带来的影响，我们在实现读写分离时，可以采用以下几种方案做优化。</p>
+<h4 id="读请求分类"><a href="#读请求分类" class="headerlink" title="读请求分类"></a>读请求分类</h4><p>一般来说，虽然我们做了读写分离，但是也不是无脑分的，我们还会把读请求分成两类，一类是可以接受延迟的读，一类是不能接受延迟的读。</p>
+<p>比如历史订单的查询、比如数据报表的生成、比如数据对账的查询、比如非关键业务的查询，比如评论信息等，这些都是可以延迟的读，这些读的话就可以完全从备库走。</p>
+<p>而对于那些不能接受延迟的读，那么就需要注意了，就需要考虑进行强制读主库。</p>
+<p>这种方案其实是用的比较多的，不要以为他是逃避了问题，有的时候，没必要给自己创造困难硬上！</p>
+<h4 id="强制读主库"><a href="#强制读主库" class="headerlink" title="强制读主库"></a>强制读主库</h4><p>上面我们提到了对于一些不能接受延迟的读请求，需要强制走主库。</p>
+<p>还有一些情况，那就是一些核心的业务操作，或者是在一个事务上下文中的读请求，这时候也需要读主库的。</p>
+<p>比如说我在创建订单的过程中，我会先插入一个订单，然后再查询订单信息进行后续操作，这个过程中，是要保证数据一定能查到的，这时候就也需要强制走主库。</p>
+<p>具体如何实现强制读主库呢，如果是我们前面介绍的通过自己写代码分流的方案的话，就比较容易了，我们可以自己控制读写哪个数据源，那么就自己硬编码就好了。</p>
+<p>如果是使用我推荐的中间件的方案的话，比如ShardingJDBC，他也是支持强制路由的（<a href="https://shardingsphere.apache.org/document/legacy/3.x/document/cn/manual/sharding-jdbc/usage/hint/">https://shardingsphere.apache.org/document/legacy/3.x/document/cn/manual/sharding-jdbc/usage/hint/</a> ），可以通过设置hint的方式让SQL只操作主库。</p>
+<h4 id="二次读取"><a href="#二次读取" class="headerlink" title="二次读取"></a>二次读取</h4><p>除了上面我们说的强制读主库的方案，还有一个常见做法叫做二次读取。</p>
+<p>啥意思呢，就是我的读取操作，默认读从库，但是如果我从库读取的时候没读到，那我为了避免因为数据延迟导致的，那么就再进行一次从主库读取。</p>
+<p>这个实现方式的话也是需要我们定制的开发代码。但是这个方案我不太建议，因为这种一旦出现延迟，也会导致你的主库会有大量的请求过去，造成很大的压力的。</p>
+<h4 id="主备一致"><a href="#主备一致" class="headerlink" title="主备一致"></a>主备一致</h4><p>除了上面说的方案之外，还有一些场景中，是采用了一些特殊的手段，来确保主备一致。</p>
+<p>比如在极客时间的《MySQL 45讲》中，作者提到过一些方案（但是其实用的都不多，还是前面说的几个方案更多一点）：</p>
+<p>Sleep方案：就是主库更新之后，读从库之前先sleep 1秒，然后再读从库。</p>
+<p>判断主备无延迟方案：每次从库执行查询请求前，先判断 seconds_behind_master 是否已经等于 0。如果还不等于 0 ，那就必须等到这个参数变为 0 才能执行查询请求。</p>
+<p>等主库位点方案：其核心思想是在从库上执行读操作前，确保从库已经同步了特定的主库位点（即主库的数据变更位置）。这样可以保证读操作获取的数据是最新的，避免了因主从复制延迟而导致的数据不一致问题。</p>
+<p>等 GTID 方案：和位点原理一样，MySQL 5.7.6 版本开始，允许在执行完更新类事务后，把这个事务的 GTID 返回给客户端，在执行读操作前，应用检查从库是否已经应用了该GTID标识的事务。这通常涉及查询从库的复制状态，确认已经处理的GTID集合包含了特定的GTID。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">GTID（Global Transaction Identifier）为每个事务提供了一个全局唯一的标识符，使得主从复制过程中的数据变更能够更加精确和容易追踪。</span><br></pre></td></tr></table></figure>
+
+]]></content>
+      <categories>
+        <category>高性能</category>
+      </categories>
   </entry>
 </search>
