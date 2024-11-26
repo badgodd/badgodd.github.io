@@ -28,7 +28,7 @@
 <meta property="og:description" content="背景我的项目中，有这样一个场景，我们要发起一个用户主动还款之后，需要把在途的扣款单全部暂停，但是因为用户选择还款单据可能比较多，而且暂停是调用外部资金打款系统的接口实现的，这个地方如果一条一条执行就很慢，但是如果起多线程执行的话，我就没办法知道他们每一个暂定的返回结果。 我想可以实现一个这样的功能：多线程去执行暂停动作，如果都成功了，那么就推进我的主动扣款后续流程，如果暂停有任何一个接口调用失败了">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2023-07-26T07:48:47.000Z">
-<meta property="article:modified_time" content="2024-11-26T08:32:33.209Z">
+<meta property="article:modified_time" content="2024-11-26T09:05:02.205Z">
 <meta property="article:author" content="bad godd">
 <meta property="article:tag" content="多线程">
 <meta name="twitter:card" content="summary">
@@ -260,7 +260,7 @@
 <p> 技术选型 </p>
 <p>为了实现这个功能，我了解到CompletableFuture，他是Java 8中引入的一个新特性，它提供了一种简单的方法来实现异步编程和任务组合。</p>
 <p>他的多线程编排的能力刚好可以用在我这个场景中，而且他底层是基于ForkJoinPool实现的，所以他的性能也比较高效，所以最终我选择了这个方案。</p>
-<h4 id="具体实现"><a href="#具体实现" class="headerlink" title="具体实现"></a>具体实现</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">//异步暂停扣款</span><br><span class="line">CompletableFuture&lt;Void&gt; allFutures = CompletableFuture.allOf(noticeDetails.stream()</span><br><span class="line">        .map(detail -&gt; CompletableFuture.supplyAsync(() -&gt; &#123;</span><br><span class="line">            pause(detail);</span><br><span class="line">            return null;</span><br><span class="line">        &#125;)).toArray(CompletableFuture[]::new));</span><br><span class="line"></span><br><span class="line">//所有暂停扣款成功后，更新代还通知单</span><br><span class="line">allFutures.whenComplete((v, e) -&gt; &#123;</span><br><span class="line">    if (e == null) &#123;</span><br><span class="line">        //执行后续的还款操作</span><br><span class="line">        //...</span><br><span class="line">        //...</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">        log.error(&quot;notice failed&quot;, e);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+<h4 id="具体实现"><a href="#具体实现" class="headerlink" title="具体实现"></a>具体实现</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//异步暂停扣款</span></span><br><span class="line">CompletableFuture&lt;Void&gt; allFutures = CompletableFuture.allOf(noticeDetails.stream()</span><br><span class="line">        .map(detail -&gt; CompletableFuture.supplyAsync(() -&gt; &#123;</span><br><span class="line">            pause(detail);</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">        &#125;)).toArray(CompletableFuture[]::<span class="keyword">new</span>));</span><br><span class="line"></span><br><span class="line"><span class="comment">//所有暂停扣款成功后，更新代还通知单</span></span><br><span class="line">allFutures.whenComplete((v, e) -&gt; &#123;</span><br><span class="line">    <span class="keyword">if</span> (e == <span class="literal">null</span>) &#123;</span><br><span class="line">        <span class="comment">//执行后续的还款操作</span></span><br><span class="line">        <span class="comment">//...</span></span><br><span class="line">        <span class="comment">//...</span></span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        log.error(<span class="string">&quot;notice failed&quot;</span>, e);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
 
 
 
@@ -381,7 +381,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">10</span>
+          <span class="site-state-item-count">11</span>
           <span class="site-state-item-name">博客</span>
         </a>
       </div>
