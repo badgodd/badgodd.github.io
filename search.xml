@@ -295,4 +295,25 @@
         <tag>Hexo</tag>
       </tags>
   </entry>
+  <entry>
+    <title>使用CompletableFuture完成并发编排，提升接口性能</title>
+    <url>/2023/07/26/%E4%BD%BF%E7%94%A8CompletableFuture%E5%AE%8C%E6%88%90%E5%B9%B6%E5%8F%91%E7%BC%96%E6%8E%92%EF%BC%8C%E6%8F%90%E5%8D%87%E6%8E%A5%E5%8F%A3%E6%80%A7%E8%83%BD/</url>
+    <content><![CDATA[<h4 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h4><p>我的项目中，有这样一个场景，我们要发起一个用户主动还款之后，需要把在途的扣款单全部暂停，但是因为用户选择还款单据可能比较多，而且暂停是调用外部资金打款系统的接口实现的，这个地方如果一条一条执行就很慢，但是如果起多线程执行的话，我就没办法知道他们每一个暂定的返回结果。</p>
+<p>我想可以实现一个这样的功能：多线程去执行暂停动作，如果都成功了，那么就推进我的主动扣款后续流程，如果暂停有任何一个接口调用失败了，那么先不推进后续流程，等下次重试。</p>
+<p> 技术选型 </p>
+<p>为了实现这个功能，我了解到CompletableFuture，他是Java 8中引入的一个新特性，它提供了一种简单的方法来实现异步编程和任务组合。</p>
+<p>他的多线程编排的能力刚好可以用在我这个场景中，而且他底层是基于ForkJoinPool实现的，所以他的性能也比较高效，所以最终我选择了这个方案。</p>
+<h4 id="具体实现"><a href="#具体实现" class="headerlink" title="具体实现"></a>具体实现</h4><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">//异步暂停扣款</span><br><span class="line">CompletableFuture&lt;Void&gt; allFutures = CompletableFuture.allOf(noticeDetails.stream()</span><br><span class="line">        .map(detail -&gt; CompletableFuture.supplyAsync(() -&gt; &#123;</span><br><span class="line">            pause(detail);</span><br><span class="line">            return null;</span><br><span class="line">        &#125;)).toArray(CompletableFuture[]::new));</span><br><span class="line"></span><br><span class="line">//所有暂停扣款成功后，更新代还通知单</span><br><span class="line">allFutures.whenComplete((v, e) -&gt; &#123;</span><br><span class="line">    if (e == null) &#123;</span><br><span class="line">        //执行后续的还款操作</span><br><span class="line">        //...</span><br><span class="line">        //...</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">        log.error(&quot;notice failed&quot;, e);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+
+
+<h4 id="得到结果"><a href="#得到结果" class="headerlink" title="得到结果"></a>得到结果</h4><p>在用了CompletableFuture做编排之前，原来50笔订单的暂停扣款，需要大概10s左右，但是用了CompletableFuture之后，50笔订单的暂停扣款只需要1秒钟左右。</p>
+]]></content>
+      <categories>
+        <category>JUC</category>
+      </categories>
+      <tags>
+        <tag>多线程</tag>
+      </tags>
+  </entry>
 </search>

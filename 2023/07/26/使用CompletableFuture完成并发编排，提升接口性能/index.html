@@ -20,20 +20,20 @@
     var CONFIG = {"hostname":"badgodd.github.io","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
-  <meta name="description" content="一、问题描述项目上想合并代码，以自己的分支master作为主分支，要合并分支study，结果在 git merge study 的时候报如下错误其实在 git checkout 的时候也会出现这个错误 12error: pathspec &amp;#x27;origin&#x2F;XXX&amp;#x27; did not match any file(s) known to git.发现是本地git没有识别到远程git仓">
+  <meta name="description" content="背景我的项目中，有这样一个场景，我们要发起一个用户主动还款之后，需要把在途的扣款单全部暂停，但是因为用户选择还款单据可能比较多，而且暂停是调用外部资金打款系统的接口实现的，这个地方如果一条一条执行就很慢，但是如果起多线程执行的话，我就没办法知道他们每一个暂定的返回结果。 我想可以实现一个这样的功能：多线程去执行暂停动作，如果都成功了，那么就推进我的主动扣款后续流程，如果暂停有任何一个接口调用失败了">
 <meta property="og:type" content="article">
-<meta property="og:title" content="git使用中 error: pathspec ‘xxx‘ did not match any file(s) known to git 报错解决方法">
-<meta property="og:url" content="https://badgodd.github.io/2022/01/03/git%E4%BD%BF%E7%94%A8%E4%B8%AD-error-pathspec-%E2%80%98xxx%E2%80%98-did-not-match-any-file-s-known-to-git-%E6%8A%A5%E9%94%99%E8%A7%A3%E5%86%B3%E6%96%B9%E6%B3%95/index.html">
+<meta property="og:title" content="使用CompletableFuture完成并发编排，提升接口性能">
+<meta property="og:url" content="https://badgodd.github.io/2023/07/26/%E4%BD%BF%E7%94%A8CompletableFuture%E5%AE%8C%E6%88%90%E5%B9%B6%E5%8F%91%E7%BC%96%E6%8E%92%EF%BC%8C%E6%8F%90%E5%8D%87%E6%8E%A5%E5%8F%A3%E6%80%A7%E8%83%BD/index.html">
 <meta property="og:site_name" content="Bad Godd&#39;s Blog">
-<meta property="og:description" content="一、问题描述项目上想合并代码，以自己的分支master作为主分支，要合并分支study，结果在 git merge study 的时候报如下错误其实在 git checkout 的时候也会出现这个错误 12error: pathspec &amp;#x27;origin&#x2F;XXX&amp;#x27; did not match any file(s) known to git.发现是本地git没有识别到远程git仓">
+<meta property="og:description" content="背景我的项目中，有这样一个场景，我们要发起一个用户主动还款之后，需要把在途的扣款单全部暂停，但是因为用户选择还款单据可能比较多，而且暂停是调用外部资金打款系统的接口实现的，这个地方如果一条一条执行就很慢，但是如果起多线程执行的话，我就没办法知道他们每一个暂定的返回结果。 我想可以实现一个这样的功能：多线程去执行暂停动作，如果都成功了，那么就推进我的主动扣款后续流程，如果暂停有任何一个接口调用失败了">
 <meta property="og:locale" content="zh_CN">
-<meta property="article:published_time" content="2022-01-03T12:11:04.000Z">
-<meta property="article:modified_time" content="2023-10-13T03:12:20.795Z">
+<meta property="article:published_time" content="2023-07-26T07:48:47.000Z">
+<meta property="article:modified_time" content="2024-11-26T08:32:33.209Z">
 <meta property="article:author" content="bad godd">
-<meta property="article:tag" content="Git">
+<meta property="article:tag" content="多线程">
 <meta name="twitter:card" content="summary">
 
-<link rel="canonical" href="https://badgodd.github.io/2022/01/03/git%E4%BD%BF%E7%94%A8%E4%B8%AD-error-pathspec-%E2%80%98xxx%E2%80%98-did-not-match-any-file-s-known-to-git-%E6%8A%A5%E9%94%99%E8%A7%A3%E5%86%B3%E6%96%B9%E6%B3%95/">
+<link rel="canonical" href="https://badgodd.github.io/2023/07/26/%E4%BD%BF%E7%94%A8CompletableFuture%E5%AE%8C%E6%88%90%E5%B9%B6%E5%8F%91%E7%BC%96%E6%8E%92%EF%BC%8C%E6%8F%90%E5%8D%87%E6%8E%A5%E5%8F%A3%E6%80%A7%E8%83%BD/">
 
 
 <script id="page-configurations">
@@ -46,7 +46,7 @@
   };
 </script>
 
-  <title>git使用中 error: pathspec ‘xxx‘ did not match any file(s) known to git 报错解决方法 | Bad Godd's Blog</title>
+  <title>使用CompletableFuture完成并发编排，提升接口性能 | Bad Godd's Blog</title>
   
 
 
@@ -195,7 +195,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2022/01/03/git%E4%BD%BF%E7%94%A8%E4%B8%AD-error-pathspec-%E2%80%98xxx%E2%80%98-did-not-match-any-file-s-known-to-git-%E6%8A%A5%E9%94%99%E8%A7%A3%E5%86%B3%E6%96%B9%E6%B3%95/">
+    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2023/07/26/%E4%BD%BF%E7%94%A8CompletableFuture%E5%AE%8C%E6%88%90%E5%B9%B6%E5%8F%91%E7%BC%96%E6%8E%92%EF%BC%8C%E6%8F%90%E5%8D%87%E6%8E%A5%E5%8F%A3%E6%80%A7%E8%83%BD/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/touxiang.jpg">
@@ -208,7 +208,7 @@
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
-          git使用中 error: pathspec ‘xxx‘ did not match any file(s) known to git 报错解决方法
+          使用CompletableFuture完成并发编排，提升接口性能
         </h1>
 
         <div class="post-meta">
@@ -218,7 +218,7 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2022-01-03 20:11:04" itemprop="dateCreated datePublished" datetime="2022-01-03T20:11:04+08:00">2022-01-03</time>
+              <time title="创建时间：2023-07-26 15:48:47" itemprop="dateCreated datePublished" datetime="2023-07-26T15:48:47+08:00">2023-07-26</time>
             </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -226,7 +226,7 @@
               </span>
               <span class="post-meta-item-text">分类于</span>
                 <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Git/" itemprop="url" rel="index"><span itemprop="name">Git</span></a>
+                  <a href="/categories/JUC/" itemprop="url" rel="index"><span itemprop="name">JUC</span></a>
                 </span>
             </span>
 
@@ -236,7 +236,7 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>1.2k</span>
+              <span>877</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
@@ -255,35 +255,16 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <h2 id="一、问题描述"><a href="#一、问题描述" class="headerlink" title="一、问题描述"></a>一、问题描述</h2><p>项目上想合并代码，以自己的分支master作为主分支，要合并分支study，结果<br>在 git merge study 的时候报如下错误<br>其实在 git checkout 的时候也会出现这个错误</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">error: pathspec &#x27;origin/XXX&#x27; did not match any file(s) known to git.</span><br><span class="line">发现是本地git没有识别到远程git仓库的分支</span><br></pre></td></tr></table></figure>
-
-<h2 id="二、解决办法"><a href="#二、解决办法" class="headerlink" title="二、解决办法"></a>二、解决办法</h2><p>1、首先看下所有分支 是否有新分支</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git branch -a</span><br></pre></td></tr></table></figure>
-
-<p>2、如果没看到，那么执行以下操作，这步是获取所有分支</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git fetch</span><br></pre></td></tr></table></figure>
-
-
-<p>执行完会看到这样提示</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">remote: Enumerating objects: 4, done.</span><br><span class="line">remote: Counting objects: 100% (4/4), done.</span><br><span class="line">Unpacking objects: 100% (4/4), 1.06 KiB | 90.00 KiB/s, done.</span><br><span class="line">From codeup.aliyun.com:5eeb0689892c58bb7c394ab5/pxb/pxb-fronted</span><br><span class="line"> * [new branch]      XXX -&gt; origin/XXX</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+        <h4 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h4><p>我的项目中，有这样一个场景，我们要发起一个用户主动还款之后，需要把在途的扣款单全部暂停，但是因为用户选择还款单据可能比较多，而且暂停是调用外部资金打款系统的接口实现的，这个地方如果一条一条执行就很慢，但是如果起多线程执行的话，我就没办法知道他们每一个暂定的返回结果。</p>
+<p>我想可以实现一个这样的功能：多线程去执行暂停动作，如果都成功了，那么就推进我的主动扣款后续流程，如果暂停有任何一个接口调用失败了，那么先不推进后续流程，等下次重试。</p>
+<p> 技术选型 </p>
+<p>为了实现这个功能，我了解到CompletableFuture，他是Java 8中引入的一个新特性，它提供了一种简单的方法来实现异步编程和任务组合。</p>
+<p>他的多线程编排的能力刚好可以用在我这个场景中，而且他底层是基于ForkJoinPool实现的，所以他的性能也比较高效，所以最终我选择了这个方案。</p>
+<h4 id="具体实现"><a href="#具体实现" class="headerlink" title="具体实现"></a>具体实现</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">//异步暂停扣款</span><br><span class="line">CompletableFuture&lt;Void&gt; allFutures = CompletableFuture.allOf(noticeDetails.stream()</span><br><span class="line">        .map(detail -&gt; CompletableFuture.supplyAsync(() -&gt; &#123;</span><br><span class="line">            pause(detail);</span><br><span class="line">            return null;</span><br><span class="line">        &#125;)).toArray(CompletableFuture[]::new));</span><br><span class="line"></span><br><span class="line">//所有暂停扣款成功后，更新代还通知单</span><br><span class="line">allFutures.whenComplete((v, e) -&gt; &#123;</span><br><span class="line">    if (e == null) &#123;</span><br><span class="line">        //执行后续的还款操作</span><br><span class="line">        //...</span><br><span class="line">        //...</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">        log.error(&quot;notice failed&quot;, e);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
 
 
 
-<p>3、切换到远程分支:</p>
-<p>git checkout origin&#x2F;xxx</p>
-<p>提示：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">Note: switching to &#x27;origin/xxx&#x27;.</span><br><span class="line"></span><br><span class="line">You are in &#x27;detached HEAD&#x27; state. You can look around, make experimental</span><br><span class="line">changes and commit them, and you can discard any commits you make in this</span><br><span class="line">state without impacting any branches by switching back to a branch.</span><br><span class="line"></span><br><span class="line">If you want to create a new branch to retain commits you create, you may</span><br><span class="line">do so (now or later) by using -c with the switch command. Example:</span><br><span class="line"></span><br><span class="line">  git switch -c &lt;new-branch-name&gt;</span><br><span class="line"></span><br><span class="line">Or undo this operation with:</span><br><span class="line"></span><br><span class="line">  git switch -</span><br><span class="line"></span><br><span class="line">Turn off this advice by setting config variable advice.detachedHead to false</span><br><span class="line"></span><br><span class="line">HEAD is now at dc877cd XXX</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-<p>4、现在可以看到自己的分支是一串数字字母，这时新建并切换到分支</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git checkout -b xxx</span><br></pre></td></tr></table></figure>
-
-<p>5、现在需要跟远程的分支进行关联</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git branch -u origin/xxx</span><br></pre></td></tr></table></figure>
-
-<p>6、这时我们执行git pull来看看什么反馈:</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Already up-to-date.</span><br></pre></td></tr></table></figure>
-
+<h4 id="得到结果"><a href="#得到结果" class="headerlink" title="得到结果"></a>得到结果</h4><p>在用了CompletableFuture做编排之前，原来50笔订单的暂停扣款，需要大概10s左右，但是用了CompletableFuture之后，50笔订单的暂停扣款只需要1秒钟左右。</p>
 
     </div>
 
@@ -299,7 +280,7 @@
   </li>
   <li class="post-copyright-link">
     <strong>本文链接：</strong>
-    <a href="https://badgodd.github.io/2022/01/03/git%E4%BD%BF%E7%94%A8%E4%B8%AD-error-pathspec-%E2%80%98xxx%E2%80%98-did-not-match-any-file-s-known-to-git-%E6%8A%A5%E9%94%99%E8%A7%A3%E5%86%B3%E6%96%B9%E6%B3%95/" title="git使用中 error: pathspec ‘xxx‘ did not match any file(s) known to git 报错解决方法">https://badgodd.github.io/2022/01/03/git使用中-error-pathspec-‘xxx‘-did-not-match-any-file-s-known-to-git-报错解决方法/</a>
+    <a href="https://badgodd.github.io/2023/07/26/%E4%BD%BF%E7%94%A8CompletableFuture%E5%AE%8C%E6%88%90%E5%B9%B6%E5%8F%91%E7%BC%96%E6%8E%92%EF%BC%8C%E6%8F%90%E5%8D%87%E6%8E%A5%E5%8F%A3%E6%80%A7%E8%83%BD/" title="使用CompletableFuture完成并发编排，提升接口性能">https://badgodd.github.io/2023/07/26/使用CompletableFuture完成并发编排，提升接口性能/</a>
   </li>
   <li class="post-copyright-license">
     <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/zh-CN" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
@@ -310,7 +291,7 @@
 
       <footer class="post-footer">
           <div class="post-tags">
-              <a href="/tags/Git/" rel="tag"># Git</a>
+              <a href="/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B/" rel="tag"># 多线程</a>
           </div>
 
         
@@ -319,12 +300,12 @@
         
     <div class="post-nav">
       <div class="post-nav-item">
-    <a href="/2022/01/02/%E8%A7%A3%E5%86%B3hexo-Typora-%E5%9B%BE%E7%89%87%E4%B8%8A%E4%BC%A0%E9%97%AE%E9%A2%98/" rel="prev" title="解决hexo + Typora 图片上传问题">
-      <i class="fa fa-chevron-left"></i> 解决hexo + Typora 图片上传问题
+    <a href="/2023/06/11/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98FullGC/" rel="prev" title="线上问题FullGC">
+      <i class="fa fa-chevron-left"></i> 线上问题FullGC
     </a></div>
       <div class="post-nav-item">
-    <a href="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/" rel="next" title="双亲委派企业级应用">
-      双亲委派企业级应用 <i class="fa fa-chevron-right"></i>
+    <a href="/2023/07/31/%E5%BC%95%E5%85%A5%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81%E8%A7%A3%E5%86%B3%E5%B9%B6%E5%8F%91%E9%97%AE%E9%A2%98/" rel="next" title="引入分布式锁解决并发问题">
+      引入分布式锁解决并发问题 <i class="fa fa-chevron-right"></i>
     </a></div>
     </div>
       </footer>
@@ -384,7 +365,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E9%97%AE%E9%A2%98%E6%8F%8F%E8%BF%B0"><span class="nav-number">1.</span> <span class="nav-text">一、问题描述</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E8%A7%A3%E5%86%B3%E5%8A%9E%E6%B3%95"><span class="nav-number">2.</span> <span class="nav-text">二、解决办法</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%83%8C%E6%99%AF"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%85%B7%E4%BD%93%E5%AE%9E%E7%8E%B0"><span class="nav-number">2.</span> <span class="nav-text">具体实现</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%BE%97%E5%88%B0%E7%BB%93%E6%9E%9C"><span class="nav-number">3.</span> <span class="nav-text">得到结果</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
