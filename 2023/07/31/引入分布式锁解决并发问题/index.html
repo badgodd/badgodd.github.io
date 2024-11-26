@@ -28,7 +28,7 @@
 <meta property="og:description" content="背景我的项目中，有一个场景会出现并发问题，就是我们有一个支付单，这个支付单会有到期的自动关闭，以及用户也可以主动取消订单进行关闭。 这两个操作，有的时候就会出现并发的问题，导致重复关单，重复发消息给下游，导致下游处理失败。 为了解决这个并发的问题，我在项目中采用了分布式锁来解决。 技术选型其实分布式锁有很多种方案，无非就是借助一个第三方的系统，来做互斥性的协调。那么市面上主流的实现方式就是基于数据">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2023-07-31T02:48:47.000Z">
-<meta property="article:modified_time" content="2024-11-26T08:29:06.306Z">
+<meta property="article:modified_time" content="2024-11-26T08:47:23.000Z">
 <meta property="article:author" content="bad godd">
 <meta property="article:tag" content="多线程">
 <meta name="twitter:card" content="summary">
@@ -306,7 +306,10 @@
     <a href="/2023/07/26/%E4%BD%BF%E7%94%A8CompletableFuture%E5%AE%8C%E6%88%90%E5%B9%B6%E5%8F%91%E7%BC%96%E6%8E%92%EF%BC%8C%E6%8F%90%E5%8D%87%E6%8E%A5%E5%8F%A3%E6%80%A7%E8%83%BD/" rel="prev" title="使用CompletableFuture完成并发编排，提升接口性能">
       <i class="fa fa-chevron-left"></i> 使用CompletableFuture完成并发编排，提升接口性能
     </a></div>
-      <div class="post-nav-item"></div>
+      <div class="post-nav-item">
+    <a href="/2023/11/17/Redisson%E7%9A%84watchdog%E6%9C%BA%E5%88%B6%E6%98%AF%E6%80%8E%E4%B9%88%E6%A0%B7%E7%9A%84%EF%BC%9F/" rel="next" title="Redisson的watchdog机制是怎么样的？">
+      Redisson的watchdog机制是怎么样的？ <i class="fa fa-chevron-right"></i>
+    </a></div>
     </div>
       </footer>
     
@@ -381,7 +384,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">9</span>
+          <span class="site-state-item-count">10</span>
           <span class="site-state-item-name">博客</span>
         </a>
       </div>
@@ -394,7 +397,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">8</span>
+        <span class="site-state-item-count">9</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

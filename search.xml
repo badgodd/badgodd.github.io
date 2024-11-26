@@ -1,6 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>Redisson的watchdog机制是怎么样的？</title>
+    <url>/2023/11/17/Redisson%E7%9A%84watchdog%E6%9C%BA%E5%88%B6%E6%98%AF%E6%80%8E%E4%B9%88%E6%A0%B7%E7%9A%84%EF%BC%9F/</url>
+    <content><![CDATA[<p>为了避免Redis实现的分布式锁超时，Redisson中引入了watch dog的机制，他可以帮助我们在Redisson实例被关闭前，不断的延长锁的有效期。</p>
+<p>自动续租：当一个Redisson客户端实例获取到一个分布式锁时，如果没有指定锁的超时时间，Watchdog会基于Netty的时间轮启动一个后台任务，定期向Redis发送命令，重新设置锁的过期时间，通常是锁的租约时间的1&#x2F;3。这确保了即使客户端处理时间较长，所持有的锁也不会过期。<br>续期时长：默认情况下，每10s钟做一次续期，续期时长是30s。<br>停止续期：当锁被释放或者客户端实例被关闭时，Watchdog会自动停止对应锁的续租任务。</p>
+<p>在Redisson中，watch dog的主要实现在<a href="https://github.com/redisson/redisson/blob/master/redisson/src/main/java/org/redisson/RedissonBaseLock.java#L155">scheduleExpirationRenewal</a>方法中：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">protected void scheduleExpirationRenewal(long threadId) &#123;</span><br><span class="line">    ExpirationEntry entry = new ExpirationEntry();</span><br><span class="line">    ExpirationEntry oldEntry = EXPIRATION_RENEWAL_MAP.putIfAbsent(getEntryName(), entry);</span><br><span class="line">    if (oldEntry != null) &#123;</span><br><span class="line">        oldEntry.addThreadId(threadId);</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">        entry.addThreadId(threadId);</span><br><span class="line">        try &#123;</span><br><span class="line">            renewExpiration();</span><br><span class="line">        &#125; finally &#123;</span><br><span class="line">            if (Thread.currentThread().isInterrupted()) &#123;</span><br><span class="line">                cancelExpirationRenewal(threadId);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">//定时任务执行续期</span><br><span class="line">private void renewExpiration() &#123;</span><br><span class="line">    ExpirationEntry ee = EXPIRATION_RENEWAL_MAP.get(getEntryName());</span><br><span class="line">    if (ee == null) &#123;</span><br><span class="line">        return;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    Timeout task = getServiceManager().newTimeout(new TimerTask() &#123;</span><br><span class="line">        @Override</span><br><span class="line">        public void run(Timeout timeout) throws Exception &#123;</span><br><span class="line">            ExpirationEntry ent = EXPIRATION_RENEWAL_MAP.get(getEntryName());</span><br><span class="line">            if (ent == null) &#123;</span><br><span class="line">                return;</span><br><span class="line">            &#125;</span><br><span class="line">            Long threadId = ent.getFirstThreadId();</span><br><span class="line">            if (threadId == null) &#123;</span><br><span class="line">                return;</span><br><span class="line">            &#125;</span><br><span class="line">            </span><br><span class="line">            CompletionStage&lt;Boolean&gt; future = renewExpirationAsync(threadId);</span><br><span class="line">            future.whenComplete((res, e) -&gt; &#123;</span><br><span class="line">                if (e != null) &#123;</span><br><span class="line">                    log.error(&quot;Can&#x27;t update lock &#123;&#125; expiration&quot;, getRawName(), e);</span><br><span class="line">                    EXPIRATION_RENEWAL_MAP.remove(getEntryName());</span><br><span class="line">                    return;</span><br><span class="line">                &#125;</span><br><span class="line">                </span><br><span class="line">                if (res) &#123;</span><br><span class="line">                    // reschedule itself</span><br><span class="line">                    renewExpiration();</span><br><span class="line">                &#125; else &#123;</span><br><span class="line">                    cancelExpirationRenewal(null);</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;, internalLockLeaseTime / 3, TimeUnit.MILLISECONDS);</span><br><span class="line">    </span><br><span class="line">    ee.setTimeout(task);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">//使用LUA脚本，进行续期</span><br><span class="line">protected CompletionStage&lt;Boolean&gt; renewExpirationAsync(long threadId) &#123;</span><br><span class="line">    return evalWriteAsync(getRawName(), LongCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,</span><br><span class="line">            &quot;if (redis.call(&#x27;hexists&#x27;, KEYS[1], ARGV[2]) == 1) then &quot; +</span><br><span class="line">                    &quot;redis.call(&#x27;pexpire&#x27;, KEYS[1], ARGV[1]); &quot; +</span><br><span class="line">                    &quot;return 1; &quot; +</span><br><span class="line">                    &quot;end; &quot; +</span><br><span class="line">                    &quot;return 0;&quot;,</span><br><span class="line">            Collections.singletonList(getRawName()),</span><br><span class="line">            internalLockLeaseTime, getLockName(threadId));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<p>可以看到，上面的代码的主要逻辑就是用了一个TimerTask来实现了一个定时任务，设置了internalLockLeaseTime &#x2F; 3的时长进行一次锁续期。默认的超时时长是30s，那么他会每10s进行一次续期，通过LUA脚本进行续期，再续30s</p>
+<p>不过，这个续期也不是无脑续，他也是有条件的，其中ExpirationEntry ent &#x3D; EXPIRATION_RENEWAL_MAP.get(getEntryName());这个值得我们关注，他会从EXPIRATION_RENEWAL_MAP中尝试获取一个KV对，如果查不到，就不续期了。</p>
+<p>EXPIRATION_RENEWAL_MAP这个东西，会在unlock的时候操作的，对他进行remove，所以一个锁如果被解了，那么就不会再继续续期了：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">@Override</span><br><span class="line">public void unlock() &#123;</span><br><span class="line">    try &#123;</span><br><span class="line">        get(unlockAsync(Thread.currentThread().getId()));</span><br><span class="line">    &#125; catch (RedisException e) &#123;</span><br><span class="line">        if (e.getCause() instanceof IllegalMonitorStateException) &#123;</span><br><span class="line">            throw (IllegalMonitorStateException) e.getCause();</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            throw e;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">@Override</span><br><span class="line">public RFuture&lt;Void&gt; unlockAsync(long threadId) &#123;</span><br><span class="line">    return getServiceManager().execute(() -&gt; unlockAsync0(threadId));</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">private RFuture&lt;Void&gt; unlockAsync0(long threadId) &#123;</span><br><span class="line">    CompletionStage&lt;Boolean&gt; future = unlockInnerAsync(threadId);</span><br><span class="line">    CompletionStage&lt;Void&gt; f = future.handle((opStatus, e) -&gt; &#123;</span><br><span class="line">        cancelExpirationRenewal(threadId);</span><br><span class="line"></span><br><span class="line">        if (e != null) &#123;</span><br><span class="line">            if (e instanceof CompletionException) &#123;</span><br><span class="line">                throw (CompletionException) e;</span><br><span class="line">            &#125;</span><br><span class="line">            throw new CompletionException(e);</span><br><span class="line">        &#125;</span><br><span class="line">        if (opStatus == null) &#123;</span><br><span class="line">            IllegalMonitorStateException cause = new IllegalMonitorStateException(&quot;attempt to unlock lock, not locked by current thread by node id: &quot;</span><br><span class="line">                    + id + &quot; thread-id: &quot; + threadId);</span><br><span class="line">            throw new CompletionException(cause);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        return null;</span><br><span class="line">    &#125;);</span><br><span class="line"></span><br><span class="line">    return new CompletableFutureWrapper&lt;&gt;(f);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">protected void cancelExpirationRenewal(Long threadId) &#123;</span><br><span class="line">    ExpirationEntry task = EXPIRATION_RENEWAL_MAP.get(getEntryName());</span><br><span class="line">    if (task == null) &#123;</span><br><span class="line">        return;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    if (threadId != null) &#123;</span><br><span class="line">        task.removeThreadId(threadId);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if (threadId == null || task.hasNoThreads()) &#123;</span><br><span class="line">        Timeout timeout = task.getTimeout();</span><br><span class="line">        if (timeout != null) &#123;</span><br><span class="line">            timeout.cancel();</span><br><span class="line">        &#125;</span><br><span class="line">        EXPIRATION_RENEWAL_MAP.remove(getEntryName());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>以上代码，第4行-&gt;16行-&gt;22行-&gt;57行。就是一次unlock过程中，对EXPIRATION_RENEWAL_MAP进行移除，进而取消下一次锁续期的实现细节。</p>
+<p>并且在unlockAsync方法中，不管unlockInnerAsync是否执行成功，还是抛了异常，都不影响cancelExpirationRenewal的执行，也可以理解为，只要unlock方法被调用了，即使解锁未成功，那么也可以停止下一次的锁续期。</p>
+<p><strong>什么情况会进行续期</strong></p>
+<p>当我们使用Redisson创建一个分布式锁的时候，并不是所有情况都会续期的，我们可以看下以下加锁过程的代码实现：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">private RFuture&lt;Long&gt; tryAcquireAsync(long waitTime, long leaseTime, TimeUnit unit, long threadId) &#123;</span><br><span class="line">    RFuture&lt;Long&gt; ttlRemainingFuture;</span><br><span class="line">    if (leaseTime &gt; 0) &#123;</span><br><span class="line">        ttlRemainingFuture = tryLockInnerAsync(waitTime, leaseTime, unit, threadId, RedisCommands.EVAL_LONG);</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">        ttlRemainingFuture = tryLockInnerAsync(waitTime, internalLockLeaseTime,</span><br><span class="line">                TimeUnit.MILLISECONDS, threadId, RedisCommands.EVAL_LONG);</span><br><span class="line">    &#125;</span><br><span class="line">    CompletionStage&lt;Long&gt; s = handleNoSync(threadId, ttlRemainingFuture);</span><br><span class="line">    ttlRemainingFuture = new CompletableFutureWrapper&lt;&gt;(s);</span><br><span class="line"></span><br><span class="line">    CompletionStage&lt;Long&gt; f = ttlRemainingFuture.thenApply(ttlRemaining -&gt; &#123;</span><br><span class="line">        // lock acquired</span><br><span class="line">        if (ttlRemaining == null) &#123;</span><br><span class="line">            if (leaseTime &gt; 0) &#123;</span><br><span class="line">                internalLockLeaseTime = unit.toMillis(leaseTime);</span><br><span class="line">            &#125; else &#123;</span><br><span class="line">                scheduleExpirationRenewal(threadId);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        return ttlRemaining;</span><br><span class="line">    &#125;);</span><br><span class="line">    return new CompletableFutureWrapper&lt;&gt;(f);</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p><strong>什么情况会停止续期</strong></p>
+<p>如果一个锁的unlock方法被调用了，那么就会停止续期。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">protected void cancelExpirationRenewal(Long threadId) &#123;</span><br><span class="line">    ExpirationEntry task = EXPIRATION_RENEWAL_MAP.get(getEntryName());</span><br><span class="line">    if (task == null) &#123;</span><br><span class="line">        return;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    if (threadId != null) &#123;</span><br><span class="line">        task.removeThreadId(threadId);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if (threadId == null || task.hasNoThreads()) &#123;</span><br><span class="line">        Timeout timeout = task.getTimeout();</span><br><span class="line">        if (timeout != null) &#123;</span><br><span class="line">            timeout.cancel();</span><br><span class="line">        &#125;</span><br><span class="line">        EXPIRATION_RENEWAL_MAP.remove(getEntryName());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>主要就是通过EXPIRATION_RENEWAL_MAP.remove来做的。那么cancelExpirationRenewal还有下面一处调用：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">protected void scheduleExpirationRenewal(long threadId) &#123;</span><br><span class="line">    ExpirationEntry entry = new ExpirationEntry();</span><br><span class="line">    ExpirationEntry oldEntry = EXPIRATION_RENEWAL_MAP.putIfAbsent(getEntryName(), entry);</span><br><span class="line">    if (oldEntry != null) &#123;</span><br><span class="line">        oldEntry.addThreadId(threadId);</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">        entry.addThreadId(threadId);</span><br><span class="line">        try &#123;</span><br><span class="line">            renewExpiration();</span><br><span class="line">        &#125; finally &#123;</span><br><span class="line">            if (Thread.currentThread().isInterrupted()) &#123;</span><br><span class="line">                cancelExpirationRenewal(threadId);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>也就是说，在尝试开启续期的过程中，如果线程被中断了，那么就会取消续期动作了。</p>
+<p>目前，Redisson是没有针对最大续期次数和最大续期时间的支持的。所以，正常情况下，如果没有解锁，是会一直续期下去的。</p>
+<p>但是需要注意的是，Redisson的续期是Netty的时间轮（TimerTask、Timeout、Timer）的，并且操作都是基于JVM的，所以，当应用宕机、下线或者重启后，续期任务就没有了。这样也能在一定程度上避免机器挂了但是锁一直不释放导致的死锁问题。</p>
+]]></content>
+      <tags>
+        <tag>Redis</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>Safepoint安全点理解</title>
     <url>/2023/06/02/Safepoint%E5%AE%89%E5%85%A8%E7%82%B9%E7%90%86%E8%A7%A3/</url>
     <content><![CDATA[<h2 id="安全点定义"><a href="#安全点定义" class="headerlink" title="安全点定义"></a>安全点定义</h2><p>​	Safepoint 可以理解成是在代码执行过程中的一些特殊位置，当线程执行到这些位置的时候，线程可以暂停。在 SafePoint 保存了其他位置没有的一些当前线程的运行信息，供其他线程读取。这些信息包括：线程上下文的任何信息，例如对象或者非对象的内部指针等等。我们一般这么理解 SafePoint，就是线程只有运行到了 SafePoint 的位置，他的一切状态信息，才是确定的，也只有这个时候，才知道这个线程用了哪些内存，没有用哪些；并且，只有线程处于 SafePoint 位置，这时候对 JVM的堆栈信息进行修改，例如回收某一部分不用的内存，线程才会感知到，之后继续运行，每个线程都有一份自己的内存使用快照，这时候其他线程对于内存使用的修改，线程就不知道了，只有再进行到 SafePoint 的时候，才会感知。</p>
@@ -26,37 +62,6 @@
       <tags>
         <tag>JVM</tag>
         <tag>Safepoint</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>ThreadLocal内存泄露问题</title>
-    <url>/2023/05/13/ThreadLocal%E5%86%85%E5%AD%98%E6%B3%84%E9%9C%B2%E9%97%AE%E9%A2%98/</url>
-    <content><![CDATA[<p>ThreadLocal是java.lang下面的一个类，是用来解决java多线程程序中并发问题的一种途径；通过为每一个线程创建一份共享变量的副本来保证各个线程之间的变量的访问和修改互相不影响；</p>
-<p>ThreadLocal存放的值是线程内共享的，线程间互斥的，主要用于线程内共享一些数据，避免通过参数来传递，这样处理后，能够优雅的解决一些实际问题。</p>
-<p>比如一次用户的页面操作请求，我们可以在最开始的filter中，把用户的信息保存在ThreadLocal中，在同一次请求中，在使用到用户信息，就可以直接到ThreadLocal中获取就可以了。</p>
-<p>ThreadLocal有四个方法，分别为：<br>●initialValue<br>返回此线程局部变量的初始值<br>●get<br>返回此线程局部变量的当前线程副本中的值。如果这是线程第一次调用该方法，则创建并初始化此副本。<br>●set<br>将此线程局部变量的当前线程副本中的值设置为指定值。许多应用程序不需要这项功能，它们只依赖于 initialValue() 方法来设置线程局部变量的值。<br>●remove<br>移除此线程局部变量的值。</p>
-<h2 id="ThreadLocal的实现原理"><a href="#ThreadLocal的实现原理" class="headerlink" title="ThreadLocal的实现原理"></a>ThreadLocal的实现原理</h2><p>ThreadLocal当中用于保存线程的独有变量的数据结构是一个内部类：ThreadLocalMap，也是k-v结构。<br>key就是当前的ThreadLoacal对象，而v就是我们想要保存的值。</p>
-<p><img src="/2023/05/13/ThreadLocal%E5%86%85%E5%AD%98%E6%B3%84%E9%9C%B2%E9%97%AE%E9%A2%98/image-20231013144555156.png" alt="image-20231013144555156"></p>
-<p>上图中基本描述出了Thread、ThreadLocalMap以及ThreadLocal三者之间的包含关系。</p>
-<p>Thread类对象中维护了ThreadLocalMap成员变量，而ThreadLocalMap维护了以ThreadLocal为key，需要存储的数据为value的Entry数组。</p>
-<h2 id="ThreadLocal内存泄露问题"><a href="#ThreadLocal内存泄露问题" class="headerlink" title="ThreadLocal内存泄露问题"></a>ThreadLocal内存泄露问题</h2><p>ThreadLocal对象中是有两个引用的，一个是栈上的ThreadLocal引用，一个是ThreadLocalMap中的Key对他的引用。那么栈上的ThreadLocal引用不在使用了，即方法结束后这个对象引用就不再用了，那么，ThreadLocal对象因为还有一条引用链在，所以就会导致他无法被回收，久而久之可能就会对导致OOM。</p>
-<p>这就是我们所说的ThreadLocal的内存泄露问题，为了解决这个问题，ThreadLocalMap使用了弱引用。如果用了弱引用，那么ThreadLocal对象就可以在下次GC的时候被回收掉了。</p>
-<p><img src="/2023/05/13/ThreadLocal%E5%86%85%E5%AD%98%E6%B3%84%E9%9C%B2%E9%97%AE%E9%A2%98/image-20231013144809878.png" alt="image-20231013144809878"></p>
-<p>当一个线程调用ThreadLocal的set方法设置变量的时候，当前线程的ThreadLocalMap就会存放一个记录，这个记录的键为ThreadLocal的弱引用，value就是通过set设置的值，这个value值被强引用。</p>
-<p>这样做可以很大程度上的避免因为ThreadLocal的使用而导致的OOM问题，但是这个问题却无法彻底避免。</p>
-<p>因为我们可以看到，虽然key是弱引用，但是value的那条引用，还是个强引用呢！而且他的生命周期是和Thread一样的，也就是说，只要这个Thread还在， 这个对象就无法被回收。</p>
-<p>那么，什么情况下，Thread会一直在呢？那就是线程池。</p>
-<p>在线程池中，重复利用线程的时候，就会导致这个引用一直在，而value就一直无法被回收。</p>
-<p>那如何解决呢？</p>
-<p>ThreadLocalMap底层使用数组来保存元素，使用“线性探测法”来解决hash冲突的，在每次调用ThreadLocal的get、set、remove等方法的时候，内部会实际调用ThreadLocalMap的get、set、remove等操作。</p>
-<p>而ThreadLocalMap的每次get、set、remove，都会清理过期的Entry。</p>
-<p>所以，当我们在一个ThreadLocal用完之后，手动调用一下remove，就可以在下一次GC的时候，把Entry清理掉。</p>
-]]></content>
-      <categories>
-        <category>JUC</category>
-      </categories>
-      <tags>
-        <tag>ThreadLocal</tag>
       </tags>
   </entry>
   <entry>
@@ -88,6 +93,37 @@
       </categories>
       <tags>
         <tag>GC</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>ThreadLocal内存泄露问题</title>
+    <url>/2023/05/13/ThreadLocal%E5%86%85%E5%AD%98%E6%B3%84%E9%9C%B2%E9%97%AE%E9%A2%98/</url>
+    <content><![CDATA[<p>ThreadLocal是java.lang下面的一个类，是用来解决java多线程程序中并发问题的一种途径；通过为每一个线程创建一份共享变量的副本来保证各个线程之间的变量的访问和修改互相不影响；</p>
+<p>ThreadLocal存放的值是线程内共享的，线程间互斥的，主要用于线程内共享一些数据，避免通过参数来传递，这样处理后，能够优雅的解决一些实际问题。</p>
+<p>比如一次用户的页面操作请求，我们可以在最开始的filter中，把用户的信息保存在ThreadLocal中，在同一次请求中，在使用到用户信息，就可以直接到ThreadLocal中获取就可以了。</p>
+<p>ThreadLocal有四个方法，分别为：<br>●initialValue<br>返回此线程局部变量的初始值<br>●get<br>返回此线程局部变量的当前线程副本中的值。如果这是线程第一次调用该方法，则创建并初始化此副本。<br>●set<br>将此线程局部变量的当前线程副本中的值设置为指定值。许多应用程序不需要这项功能，它们只依赖于 initialValue() 方法来设置线程局部变量的值。<br>●remove<br>移除此线程局部变量的值。</p>
+<h2 id="ThreadLocal的实现原理"><a href="#ThreadLocal的实现原理" class="headerlink" title="ThreadLocal的实现原理"></a>ThreadLocal的实现原理</h2><p>ThreadLocal当中用于保存线程的独有变量的数据结构是一个内部类：ThreadLocalMap，也是k-v结构。<br>key就是当前的ThreadLoacal对象，而v就是我们想要保存的值。</p>
+<p><img src="/2023/05/13/ThreadLocal%E5%86%85%E5%AD%98%E6%B3%84%E9%9C%B2%E9%97%AE%E9%A2%98/image-20231013144555156.png" alt="image-20231013144555156"></p>
+<p>上图中基本描述出了Thread、ThreadLocalMap以及ThreadLocal三者之间的包含关系。</p>
+<p>Thread类对象中维护了ThreadLocalMap成员变量，而ThreadLocalMap维护了以ThreadLocal为key，需要存储的数据为value的Entry数组。</p>
+<h2 id="ThreadLocal内存泄露问题"><a href="#ThreadLocal内存泄露问题" class="headerlink" title="ThreadLocal内存泄露问题"></a>ThreadLocal内存泄露问题</h2><p>ThreadLocal对象中是有两个引用的，一个是栈上的ThreadLocal引用，一个是ThreadLocalMap中的Key对他的引用。那么栈上的ThreadLocal引用不在使用了，即方法结束后这个对象引用就不再用了，那么，ThreadLocal对象因为还有一条引用链在，所以就会导致他无法被回收，久而久之可能就会对导致OOM。</p>
+<p>这就是我们所说的ThreadLocal的内存泄露问题，为了解决这个问题，ThreadLocalMap使用了弱引用。如果用了弱引用，那么ThreadLocal对象就可以在下次GC的时候被回收掉了。</p>
+<p><img src="/2023/05/13/ThreadLocal%E5%86%85%E5%AD%98%E6%B3%84%E9%9C%B2%E9%97%AE%E9%A2%98/image-20231013144809878.png" alt="image-20231013144809878"></p>
+<p>当一个线程调用ThreadLocal的set方法设置变量的时候，当前线程的ThreadLocalMap就会存放一个记录，这个记录的键为ThreadLocal的弱引用，value就是通过set设置的值，这个value值被强引用。</p>
+<p>这样做可以很大程度上的避免因为ThreadLocal的使用而导致的OOM问题，但是这个问题却无法彻底避免。</p>
+<p>因为我们可以看到，虽然key是弱引用，但是value的那条引用，还是个强引用呢！而且他的生命周期是和Thread一样的，也就是说，只要这个Thread还在， 这个对象就无法被回收。</p>
+<p>那么，什么情况下，Thread会一直在呢？那就是线程池。</p>
+<p>在线程池中，重复利用线程的时候，就会导致这个引用一直在，而value就一直无法被回收。</p>
+<p>那如何解决呢？</p>
+<p>ThreadLocalMap底层使用数组来保存元素，使用“线性探测法”来解决hash冲突的，在每次调用ThreadLocal的get、set、remove等方法的时候，内部会实际调用ThreadLocalMap的get、set、remove等操作。</p>
+<p>而ThreadLocalMap的每次get、set、remove，都会清理过期的Entry。</p>
+<p>所以，当我们在一个ThreadLocal用完之后，手动调用一下remove，就可以在下一次GC的时候，把Entry清理掉。</p>
+]]></content>
+      <categories>
+        <category>JUC</category>
+      </categories>
+      <tags>
+        <tag>ThreadLocal</tag>
       </tags>
   </entry>
   <entry>
@@ -128,6 +164,27 @@
       </categories>
       <tags>
         <tag>Git</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>使用CompletableFuture完成并发编排，提升接口性能</title>
+    <url>/2023/07/26/%E4%BD%BF%E7%94%A8CompletableFuture%E5%AE%8C%E6%88%90%E5%B9%B6%E5%8F%91%E7%BC%96%E6%8E%92%EF%BC%8C%E6%8F%90%E5%8D%87%E6%8E%A5%E5%8F%A3%E6%80%A7%E8%83%BD/</url>
+    <content><![CDATA[<h4 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h4><p>我的项目中，有这样一个场景，我们要发起一个用户主动还款之后，需要把在途的扣款单全部暂停，但是因为用户选择还款单据可能比较多，而且暂停是调用外部资金打款系统的接口实现的，这个地方如果一条一条执行就很慢，但是如果起多线程执行的话，我就没办法知道他们每一个暂定的返回结果。</p>
+<p>我想可以实现一个这样的功能：多线程去执行暂停动作，如果都成功了，那么就推进我的主动扣款后续流程，如果暂停有任何一个接口调用失败了，那么先不推进后续流程，等下次重试。</p>
+<p> 技术选型 </p>
+<p>为了实现这个功能，我了解到CompletableFuture，他是Java 8中引入的一个新特性，它提供了一种简单的方法来实现异步编程和任务组合。</p>
+<p>他的多线程编排的能力刚好可以用在我这个场景中，而且他底层是基于ForkJoinPool实现的，所以他的性能也比较高效，所以最终我选择了这个方案。</p>
+<h4 id="具体实现"><a href="#具体实现" class="headerlink" title="具体实现"></a>具体实现</h4><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">//异步暂停扣款</span><br><span class="line">CompletableFuture&lt;Void&gt; allFutures = CompletableFuture.allOf(noticeDetails.stream()</span><br><span class="line">        .map(detail -&gt; CompletableFuture.supplyAsync(() -&gt; &#123;</span><br><span class="line">            pause(detail);</span><br><span class="line">            return null;</span><br><span class="line">        &#125;)).toArray(CompletableFuture[]::new));</span><br><span class="line"></span><br><span class="line">//所有暂停扣款成功后，更新代还通知单</span><br><span class="line">allFutures.whenComplete((v, e) -&gt; &#123;</span><br><span class="line">    if (e == null) &#123;</span><br><span class="line">        //执行后续的还款操作</span><br><span class="line">        //...</span><br><span class="line">        //...</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">        log.error(&quot;notice failed&quot;, e);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+
+
+<h4 id="得到结果"><a href="#得到结果" class="headerlink" title="得到结果"></a>得到结果</h4><p>在用了CompletableFuture做编排之前，原来50笔订单的暂停扣款，需要大概10s左右，但是用了CompletableFuture之后，50笔订单的暂停扣款只需要1秒钟左右。</p>
+]]></content>
+      <categories>
+        <category>JUC</category>
+      </categories>
+      <tags>
+        <tag>多线程</tag>
       </tags>
   </entry>
   <entry>
@@ -202,30 +259,6 @@
       </tags>
   </entry>
   <entry>
-    <title>引入分布式锁解决并发问题</title>
-    <url>/2023/07/31/%E5%BC%95%E5%85%A5%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81%E8%A7%A3%E5%86%B3%E5%B9%B6%E5%8F%91%E9%97%AE%E9%A2%98/</url>
-    <content><![CDATA[<h4 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h4><p>我的项目中，有一个场景会出现并发问题，就是我们有一个支付单，这个支付单会有到期的自动关闭，以及用户也可以主动取消订单进行关闭。</p>
-<p>这两个操作，有的时候就会出现并发的问题，导致重复关单，重复发消息给下游，导致下游处理失败。</p>
-<p>为了解决这个并发的问题，我在项目中采用了分布式锁来解决。</p>
-<h4 id="技术选型"><a href="#技术选型" class="headerlink" title="技术选型"></a>技术选型</h4><p>其实分布式锁有很多种方案，无非就是借助一个第三方的系统，来做互斥性的协调。那么市面上主流的实现方式就是基于数据库、zookeeper以及redis。</p>
-<p>我在选型的时候分别了解了一下这几个方案。</p>
-<p>其实最简单的肯定是数据库的方式，在数据库中建一张表，加锁时创建一条记录，解锁时再把记录删除，通过唯一性约束来避免重复的记录。当要加锁的时候，判断下数据库中是否已经有这条记录了，没有就插入一条。</p>
-<p>这个方案的话好处就是实现简单，缺点也比较明显，就是太依赖数据库，在高并发情况下，可能会对数据库造成压力，并且性能也不太好，而且也会占用很多数据库链接，影响正常的业务。</p>
-<p>基于数据库的悲观锁当然也可以实现，但是悲观锁的机制，可能会导致锁表，也会导致线程阻塞的问题，所以这个方案我也放弃了。</p>
-<p>另外在zookeeper和redis中，我选择了redis，因为redis我们现在系统中已经在用了，但是zk的话我们没有引入，并且搭建一个zk集群成本也挺高的。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">在redis中呢，我们最开始使用了setnx的方案，但是后来经常会出现并发问题，后来发现是因为有的时候，我们设置的解锁的超时时间太短了，导致锁提前释放了。但是拉长超时时间又会使得接口的吞吐量降低，后来我发现redisson其实他实现了看门狗的机制，可以帮助我们做自动续期，我就选了redisson的方案。</span><br></pre></td></tr></table></figure>
-
-<p>但是，其实现在我们这个方案也存在一定的问题，那就是在redis的主节点如果出现问题的情况下，可能会导致锁丢失，但是因为我们这个目前业务量还没有那么大，所以暂时还没有遇到这个问题，不过我也了解过，其实可以基于redlock来解决这个问题，redlock可以借助集群的投票机制，超过半数以上写入成功才算加锁成功，这样可解决单点故障的问题。后面会考虑优化一下。</p>
-<h4 id="得到的结果"><a href="#得到的结果" class="headerlink" title="得到的结果"></a>得到的结果</h4><p>解决了并发的问题</p>
-]]></content>
-      <categories>
-        <category>JUC</category>
-      </categories>
-      <tags>
-        <tag>多线程</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>线上问题FullGC</title>
     <url>/2023/06/11/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98FullGC/</url>
     <content><![CDATA[<h2 id="背景知识-background"><a href="#背景知识-background" class="headerlink" title="背景知识 (background)"></a>背景知识 (background)</h2><p>​	FullGC通常伴随着比较久的停顿和性能退化，不过不同GC算法关注点不一样。</p>
@@ -277,6 +310,30 @@
       </tags>
   </entry>
   <entry>
+    <title>引入分布式锁解决并发问题</title>
+    <url>/2023/07/31/%E5%BC%95%E5%85%A5%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81%E8%A7%A3%E5%86%B3%E5%B9%B6%E5%8F%91%E9%97%AE%E9%A2%98/</url>
+    <content><![CDATA[<h4 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h4><p>我的项目中，有一个场景会出现并发问题，就是我们有一个支付单，这个支付单会有到期的自动关闭，以及用户也可以主动取消订单进行关闭。</p>
+<p>这两个操作，有的时候就会出现并发的问题，导致重复关单，重复发消息给下游，导致下游处理失败。</p>
+<p>为了解决这个并发的问题，我在项目中采用了分布式锁来解决。</p>
+<h4 id="技术选型"><a href="#技术选型" class="headerlink" title="技术选型"></a>技术选型</h4><p>其实分布式锁有很多种方案，无非就是借助一个第三方的系统，来做互斥性的协调。那么市面上主流的实现方式就是基于数据库、zookeeper以及redis。</p>
+<p>我在选型的时候分别了解了一下这几个方案。</p>
+<p>其实最简单的肯定是数据库的方式，在数据库中建一张表，加锁时创建一条记录，解锁时再把记录删除，通过唯一性约束来避免重复的记录。当要加锁的时候，判断下数据库中是否已经有这条记录了，没有就插入一条。</p>
+<p>这个方案的话好处就是实现简单，缺点也比较明显，就是太依赖数据库，在高并发情况下，可能会对数据库造成压力，并且性能也不太好，而且也会占用很多数据库链接，影响正常的业务。</p>
+<p>基于数据库的悲观锁当然也可以实现，但是悲观锁的机制，可能会导致锁表，也会导致线程阻塞的问题，所以这个方案我也放弃了。</p>
+<p>另外在zookeeper和redis中，我选择了redis，因为redis我们现在系统中已经在用了，但是zk的话我们没有引入，并且搭建一个zk集群成本也挺高的。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">在redis中呢，我们最开始使用了setnx的方案，但是后来经常会出现并发问题，后来发现是因为有的时候，我们设置的解锁的超时时间太短了，导致锁提前释放了。但是拉长超时时间又会使得接口的吞吐量降低，后来我发现redisson其实他实现了看门狗的机制，可以帮助我们做自动续期，我就选了redisson的方案。</span><br></pre></td></tr></table></figure>
+
+<p>但是，其实现在我们这个方案也存在一定的问题，那就是在redis的主节点如果出现问题的情况下，可能会导致锁丢失，但是因为我们这个目前业务量还没有那么大，所以暂时还没有遇到这个问题，不过我也了解过，其实可以基于redlock来解决这个问题，redlock可以借助集群的投票机制，超过半数以上写入成功才算加锁成功，这样可解决单点故障的问题。后面会考虑优化一下。</p>
+<h4 id="得到的结果"><a href="#得到的结果" class="headerlink" title="得到的结果"></a>得到的结果</h4><p>解决了并发的问题</p>
+]]></content>
+      <categories>
+        <category>JUC</category>
+      </categories>
+      <tags>
+        <tag>多线程</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>解决hexo + Typora 图片上传问题</title>
     <url>/2022/01/02/%E8%A7%A3%E5%86%B3hexo-Typora-%E5%9B%BE%E7%89%87%E4%B8%8A%E4%BC%A0%E9%97%AE%E9%A2%98/</url>
     <content><![CDATA[<p>本文解决hexo + <a href="https://so.csdn.net/so/search?q=Typora&spm=1001.2101.3001.7020">Typora</a>图片上传不显示的问题</p>
@@ -293,27 +350,6 @@
 ]]></content>
       <tags>
         <tag>Hexo</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>使用CompletableFuture完成并发编排，提升接口性能</title>
-    <url>/2023/07/26/%E4%BD%BF%E7%94%A8CompletableFuture%E5%AE%8C%E6%88%90%E5%B9%B6%E5%8F%91%E7%BC%96%E6%8E%92%EF%BC%8C%E6%8F%90%E5%8D%87%E6%8E%A5%E5%8F%A3%E6%80%A7%E8%83%BD/</url>
-    <content><![CDATA[<h4 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h4><p>我的项目中，有这样一个场景，我们要发起一个用户主动还款之后，需要把在途的扣款单全部暂停，但是因为用户选择还款单据可能比较多，而且暂停是调用外部资金打款系统的接口实现的，这个地方如果一条一条执行就很慢，但是如果起多线程执行的话，我就没办法知道他们每一个暂定的返回结果。</p>
-<p>我想可以实现一个这样的功能：多线程去执行暂停动作，如果都成功了，那么就推进我的主动扣款后续流程，如果暂停有任何一个接口调用失败了，那么先不推进后续流程，等下次重试。</p>
-<p> 技术选型 </p>
-<p>为了实现这个功能，我了解到CompletableFuture，他是Java 8中引入的一个新特性，它提供了一种简单的方法来实现异步编程和任务组合。</p>
-<p>他的多线程编排的能力刚好可以用在我这个场景中，而且他底层是基于ForkJoinPool实现的，所以他的性能也比较高效，所以最终我选择了这个方案。</p>
-<h4 id="具体实现"><a href="#具体实现" class="headerlink" title="具体实现"></a>具体实现</h4><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">//异步暂停扣款</span><br><span class="line">CompletableFuture&lt;Void&gt; allFutures = CompletableFuture.allOf(noticeDetails.stream()</span><br><span class="line">        .map(detail -&gt; CompletableFuture.supplyAsync(() -&gt; &#123;</span><br><span class="line">            pause(detail);</span><br><span class="line">            return null;</span><br><span class="line">        &#125;)).toArray(CompletableFuture[]::new));</span><br><span class="line"></span><br><span class="line">//所有暂停扣款成功后，更新代还通知单</span><br><span class="line">allFutures.whenComplete((v, e) -&gt; &#123;</span><br><span class="line">    if (e == null) &#123;</span><br><span class="line">        //执行后续的还款操作</span><br><span class="line">        //...</span><br><span class="line">        //...</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">        log.error(&quot;notice failed&quot;, e);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
-
-
-
-<h4 id="得到结果"><a href="#得到结果" class="headerlink" title="得到结果"></a>得到结果</h4><p>在用了CompletableFuture做编排之前，原来50笔订单的暂停扣款，需要大概10s左右，但是用了CompletableFuture之后，50笔订单的暂停扣款只需要1秒钟左右。</p>
-]]></content>
-      <categories>
-        <category>JUC</category>
-      </categories>
-      <tags>
-        <tag>多线程</tag>
       </tags>
   </entry>
 </search>
