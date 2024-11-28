@@ -1,6 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>MySQL做索引更新的时候，会锁表吗？</title>
+    <url>/2024/05/13/MySQL%E5%81%9A%E7%B4%A2%E5%BC%95%E6%9B%B4%E6%96%B0%E7%9A%84%E6%97%B6%E5%80%99%EF%BC%8C%E4%BC%9A%E9%94%81%E8%A1%A8%E5%90%97%EF%BC%9F/</url>
+    <content><![CDATA[<p>看版本，在MySQL 5.6版本中，已经支持了Online DDL，一般来说是不会锁表了。</p>
+<p>但是，虽然支持了Online DDL也不建议在业务高峰期做变更。因为Online DDL是尽最大可能保证DDL期间不阻塞DML动作。但是需要注意，这里说的尽最大可能意味着不是所有DDL语句都会使用OnlineDDL加速。</p>
+<p>资源争抢：而且，Online DDL 在执行过程中会占用系统资源，如 CPU、内存和 I&#x2F;O。这可能会对数据库的性能产生一定影响，尤其是在数据量较大的情况下。在非高峰期执行 DDL 变更可以减少对业务操作的干扰，避免高峰期因为资源争用而影响系统性能。</p>
+<p>也可能会锁表：虽然 Online DDL 尽可能得减少了锁表的时间，但在某些复杂操作（如涉及索引重建、大量数据的表结构更改）中，可能仍会有短暂的锁表情况。所以在非高峰期进行变更，可以降低长时间锁等待对用户请求的影响。</p>
+<p>主从延迟：在主从复制的数据库架构中，DDL 操作需要同步到从库。如果高峰期有大量写入操作，DDL 操作可能会增加主从同步延迟。</p>
+]]></content>
+      <categories>
+        <category>mysql</category>
+      </categories>
+  </entry>
+  <entry>
     <title>Redisson的watchdog机制是怎么样的？</title>
     <url>/2023/12/17/Redisson%E7%9A%84watchdog%E6%9C%BA%E5%88%B6%E6%98%AF%E6%80%8E%E4%B9%88%E6%A0%B7%E7%9A%84%EF%BC%9F/</url>
     <content><![CDATA[<p>为了避免Redis实现的分布式锁超时，Redisson中引入了watch dog的机制，他可以帮助我们在Redisson实例被关闭前，不断的延长锁的有效期。</p>
@@ -100,37 +113,6 @@
       </tags>
   </entry>
   <entry>
-    <title>Young GC过于频繁</title>
-    <url>/2023/03/13/Young-GC%E8%BF%87%E4%BA%8E%E9%A2%91%E7%B9%81/</url>
-    <content><![CDATA[<h2 id="背景知识-background"><a href="#背景知识-background" class="headerlink" title="背景知识 (background)"></a>背景知识 (background)</h2><p>Young GC过于频繁，主要有以下影响：</p>
-<p>GC线程消耗的CPU时间过多，容易触发Linux CFS 限制进程的CPU<br>虽然单次GC停顿较短，但频次高了之后，整个服务的吞吐量会下降<br>GC过于频繁，慢请求产生的临时对象经过几轮YoungGC后容易晋升到老年代<br>目前YoungGC一分钟超过60次，则会触发报警，建议控制在20次&#x2F;分钟以内。</p>
-<h2 id="查看指标-dashboard"><a href="#查看指标-dashboard" class="headerlink" title="查看指标 (dashboard)"></a>查看指标 (dashboard)</h2><p>展开: JVM &#x2F; 内存 &#x2F; GC &#x2F; ClassLoader这一行，找到监控面板：GC耗时 和 GC原因与频次。</p>
-<p><img src="/2023/03/13/Young-GC%E8%BF%87%E4%BA%8E%E9%A2%91%E7%B9%81/image-20231013105605631.png" alt="image-20231013105605631"></p>
-<h2 id="止损措施-action"><a href="#止损措施-action" class="headerlink" title="止损措施 (action)"></a>止损措施 (action)</h2><p>Young GC频繁，通常不用立即处理，大多需要优化代码。</p>
-<p>不同物理机的配置、性能各异，若因CPU限制导致长尾请求集中在某个节点上，可先摘流。</p>
-<p>事后改进(postmortem)<br>Young GC过于频繁，说明JVM内存分配压力大，可能是Young区比较小或者代码加载到内存的数据过多。</p>
-<p>可参考原因部分，优化代码，调整GC参数。</p>
-<p>尽量一次调整一个GC参数，灰度观察，排除干扰数据</p>
-<h2 id="可能的原因-cause"><a href="#可能的原因-cause" class="headerlink" title="可能的原因 (cause)"></a>可能的原因 (cause)</h2><p>YoungGC频繁一般是内存问题，在优化代码降低频率的同时，也需关注某个时间段的累计耗时。总的来说，在CPU Quota允许的范围内，GC总耗时越少越好，GC频率反倒不是那么重要。</p>
-<p>一、Eden区过小<br>g1 newSizePercent</p>
-<p>二. 大批量加载数据。</p>
-<p>三. 内存分配速率过高</p>
-<p>代码原因导致的数据加载过多，常见于：</p>
-<ol>
-<li>文件上传下载、报表导入导出</li>
-<li>数据量随业务发展突增，代码没有分页或没有限制分页大小，或部分请求参数组合导致返回了大量数据</li>
-<li>业务逻辑涉及的内存全量加载到内存里计算，不复用中间结果，相同的数据重复请求</li>
-<li>Redis缓存了大List，导致序列化&#x2F;反序列化临时对象过多</li>
-</ol>
-]]></content>
-      <categories>
-        <category>JVM</category>
-      </categories>
-      <tags>
-        <tag>GC</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>git使用中 error: pathspec ‘xxx‘ did not match any file(s) known to git 报错解决方法</title>
     <url>/2022/01/03/git%E4%BD%BF%E7%94%A8%E4%B8%AD-error-pathspec-%E2%80%98xxx%E2%80%98-did-not-match-any-file-s-known-to-git-%E6%8A%A5%E9%94%99%E8%A7%A3%E5%86%B3%E6%96%B9%E6%B3%95/</url>
     <content><![CDATA[<h2 id="一、问题描述"><a href="#一、问题描述" class="headerlink" title="一、问题描述"></a>一、问题描述</h2><p>项目上想合并代码，以自己的分支master作为主分支，要合并分支study，结果<br>在 git merge study 的时候报如下错误<br>其实在 git checkout 的时候也会出现这个错误</p>
@@ -169,6 +151,52 @@
       <tags>
         <tag>Git</tag>
       </tags>
+  </entry>
+  <entry>
+    <title>Young GC过于频繁</title>
+    <url>/2023/03/13/Young-GC%E8%BF%87%E4%BA%8E%E9%A2%91%E7%B9%81/</url>
+    <content><![CDATA[<h2 id="背景知识-background"><a href="#背景知识-background" class="headerlink" title="背景知识 (background)"></a>背景知识 (background)</h2><p>Young GC过于频繁，主要有以下影响：</p>
+<p>GC线程消耗的CPU时间过多，容易触发Linux CFS 限制进程的CPU<br>虽然单次GC停顿较短，但频次高了之后，整个服务的吞吐量会下降<br>GC过于频繁，慢请求产生的临时对象经过几轮YoungGC后容易晋升到老年代<br>目前YoungGC一分钟超过60次，则会触发报警，建议控制在20次&#x2F;分钟以内。</p>
+<h2 id="查看指标-dashboard"><a href="#查看指标-dashboard" class="headerlink" title="查看指标 (dashboard)"></a>查看指标 (dashboard)</h2><p>展开: JVM &#x2F; 内存 &#x2F; GC &#x2F; ClassLoader这一行，找到监控面板：GC耗时 和 GC原因与频次。</p>
+<p><img src="/2023/03/13/Young-GC%E8%BF%87%E4%BA%8E%E9%A2%91%E7%B9%81/image-20231013105605631.png" alt="image-20231013105605631"></p>
+<h2 id="止损措施-action"><a href="#止损措施-action" class="headerlink" title="止损措施 (action)"></a>止损措施 (action)</h2><p>Young GC频繁，通常不用立即处理，大多需要优化代码。</p>
+<p>不同物理机的配置、性能各异，若因CPU限制导致长尾请求集中在某个节点上，可先摘流。</p>
+<p>事后改进(postmortem)<br>Young GC过于频繁，说明JVM内存分配压力大，可能是Young区比较小或者代码加载到内存的数据过多。</p>
+<p>可参考原因部分，优化代码，调整GC参数。</p>
+<p>尽量一次调整一个GC参数，灰度观察，排除干扰数据</p>
+<h2 id="可能的原因-cause"><a href="#可能的原因-cause" class="headerlink" title="可能的原因 (cause)"></a>可能的原因 (cause)</h2><p>YoungGC频繁一般是内存问题，在优化代码降低频率的同时，也需关注某个时间段的累计耗时。总的来说，在CPU Quota允许的范围内，GC总耗时越少越好，GC频率反倒不是那么重要。</p>
+<p>一、Eden区过小<br>g1 newSizePercent</p>
+<p>二. 大批量加载数据。</p>
+<p>三. 内存分配速率过高</p>
+<p>代码原因导致的数据加载过多，常见于：</p>
+<ol>
+<li>文件上传下载、报表导入导出</li>
+<li>数据量随业务发展突增，代码没有分页或没有限制分页大小，或部分请求参数组合导致返回了大量数据</li>
+<li>业务逻辑涉及的内存全量加载到内存里计算，不复用中间结果，相同的数据重复请求</li>
+<li>Redis缓存了大List，导致序列化&#x2F;反序列化临时对象过多</li>
+</ol>
+]]></content>
+      <categories>
+        <category>JVM</category>
+      </categories>
+      <tags>
+        <tag>GC</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>一个查询语句的执行顺序是怎么样的</title>
+    <url>/2024/11/27/%E4%B8%80%E4%B8%AA%E6%9F%A5%E8%AF%A2%E8%AF%AD%E5%8F%A5%E7%9A%84%E6%89%A7%E8%A1%8C%E9%A1%BA%E5%BA%8F%E6%98%AF%E6%80%8E%E4%B9%88%E6%A0%B7%E7%9A%84/</url>
+    <content><![CDATA[<p>以下是一个比较典型的查询语句，其中包含了很多子句，其中有SELECT、FROM、JOIN、WHERE、GROUP BY、HAVING、ORDER BY和LIMIT。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">SELECT name, COUNT(*)</span><br><span class="line">FROM employees</span><br><span class="line">JOIN departments ON employees.department_id = departments.id</span><br><span class="line">WHERE employees.salary &gt; 50000</span><br><span class="line">GROUP BY departments.name</span><br><span class="line">HAVING COUNT(*) &gt; 10</span><br><span class="line">ORDER BY name</span><br><span class="line">LIMIT 5;</span><br></pre></td></tr></table></figure>
+
+<p>下面是InnoDB处理SQL查询的大致执行顺序，为啥说大致呢，因为这个顺序是逻辑上的执行顺序，实际的物理执行可能会有所不同。数据库优化器可能会根据统计信息、索引、查询类型等因素以不同的方式执行查询。</p>
+<p>1 FROM：<br>○	第一步肯定要先识别出查询中涉及的所有表。<br>2 JOIN：<br>○	根据FROM子句中的表，执行JOIN操作。如果有多个JOIN，数据库会根据内部算法和统计信息确定JOIN的顺序，以尝试优化查询效率。<br>3 WHERE：<br>○	对JOIN操作的结果应用WHERE中的过滤条件。这一步会排除不符合条件的行。<br>4 GROUP BY：<br>○	如果查询包含GROUP BY子句，此时对数据进行分组。分组操作通常在WHERE条件过滤之后进行。<br>5 HAVING：<br>○	如果有HAVING子句，它会在GROUP BY之后应用。HAVING子句用于筛选分组后的数据集。<br>6 SELECT：<br>○	选择特定的列。实际上，所需列的数据可能在执行过程的早期就已经被获取，但在此阶段会根据SELECT子句确定最终输出的列。<br>7 DISTINCT：<br>○	如果指定了DISTINCT关键字，此时会去除重复的行。<br>8 ORDER BY：<br>○	如果查询指定了ORDER BY，现在将对结果进行排序。注意，如果使用了GROUP BY，MySQL可能会利用这个排序作为GROUP BY的一部分。<br>9 LIMIT：<br>○	最后，应用LIMIT子句来限制返回的行数。这通常是整个查询过程的最后一步。</p>
+<p>如上面的SQL，我们是找出平均薪水超过50,000的部门中员工人数超过10人的前5个部门，他的执行过程如下：</p>
+<p>1 FROM：<br>○	确定涉及的表：employees和departments。<br>2 JOIN：<br>○	根据employees.department_id &#x3D; departments.id条件执行JOIN操作，将两个表的数据合并。<br>3 WHERE：<br>○	应用WHERE过滤条件employees.salary &gt; 50000，只保留薪水超过50,000的员工记录。<br>4 GROUP BY：<br>○	根据departments.name对结果集进行分组。<br>5 HAVING：<br>○	应用HAVING条件COUNT(<em>) &gt; 10，筛选出员工人数超过10人的部门。<br>6 SELECT：<br>○	选择要显示的列：name（部门名称）和COUNT(</em>)（员工数量）。<br>7 DISTINCT：<br>○	此查询没有使用DISTINCT关键字，所以跳过。<br>8 ORDER BY：<br>○	根据name（部门名称）对结果集进行排序。<br>9 LIMIT：<br>○	应用LIMIT，只返回前5条记录。</p>
+]]></content>
+      <categories>
+        <category>mysql</category>
+      </categories>
   </entry>
   <entry>
     <title>什么样的架构才算是好的架构</title>
@@ -234,6 +262,33 @@
       <tags>
         <tag>Redis</tag>
       </tags>
+  </entry>
+  <entry>
+    <title>如何保证本地缓存的一致性</title>
+    <url>/2024/10/05/%E5%A6%82%E4%BD%95%E4%BF%9D%E8%AF%81%E6%9C%AC%E5%9C%B0%E7%BC%93%E5%AD%98%E7%9A%84%E4%B8%80%E8%87%B4%E6%80%A7/</url>
+    <content><![CDATA[<p>本地缓存和分布式缓存相比有很多优点，但是最大的缺点就是存在着一致性的问题。于是就衍生出这个问题：如何保证本地缓存的一致性。</p>
+<p>想要让本地缓存保持一致性，那么也就意味着，当一台机器上的本地缓存更新或者失效时，别的机器也要感知到，并且能及时处理。</p>
+<p>首先， 有一个方案，就是给本地缓存记录一个版本，当某台机器的本地缓存更新之后，把他的最新的版本号以及缓存中的数据记录到数据库中，这样，当下次有请求请求到一个未更新过本地缓存的机器时，对比一下版本号，发现版本号旧了，那么就从数据库中更新一下本地缓存。</p>
+<p>其次，借助配置中心。当某一个机器上的本地缓存发生变更之后，向配置中心做一次配置变更，然后通过配置中心把变更再推送到每一台机器上，大家监听配置变化做本地缓存的更新。</p>
+<p>另外，借助MQ的广播消息，可以实现这个功能，当有实例需要更新本地缓存的时候，发一个MQ的广播消息，然后所有实例监听到这个广播消息后，各自更新自己的本地缓存。</p>
+<p>除了数据库、广播消息和配置中心，也可以用redis，但是，这就有点脱裤子放屁了，用了本地缓存，还要去检查redis和数据库。。。</p>
+<p>其实，真正的工作中，一般来说，对于本地缓存的使用，一般都是这样的：</p>
+<p>首先，肯定是要评估数据的变化频率，对于变化不频繁的数据，才会考虑放到本地缓存中。那种频繁更新的数据，其实并不适合放到本地缓存。比如数据库的库存，你见过哪个公司秒杀是在本地缓存做的？本地缓存这么快，咋不用呢？因为他就不适合啊。</p>
+<p>还有就是，要提前评估下业务上能否接收不一致，以及能接受的不一致的时长。如果接受不了不一致，那就绝对不能用本地缓存。</p>
+<p>如果能接受，那么就基于业务上能接受的时长设置失效时长，比如业务上可以接受10分钟的延迟，那么我们可以设置个8分钟的超时时间。这样到期之后这个缓存的内容就会自动失效。</p>
+<p>在初始化缓存的时候，可以设置参数，如expireAfterAccess、expireAfterWrite、refreshAfterWrite，利用这些参数我们可以配置自动更新及自动失效。</p>
+<h4 id="自动失效："><a href="#自动失效：" class="headerlink" title="自动失效："></a>自动失效：</h4><figure class="highlight java"><table><tr><td class="code"><pre><span class="line">Cache&lt;String, String&gt; cache = Caffeine.newBuilder()</span><br><span class="line">                .expireAfterWrite(<span class="number">5</span>, TimeUnit.SECONDS) <span class="comment">// 设置缓存项写入后的过期时间为5秒</span></span><br><span class="line">                .build();</span><br></pre></td></tr></table></figure>
+
+
+
+<p>在自动失效后，查询本地缓存就会有一次cache miss，然后下次再查询就会去分布式缓存查询，然后再缓存到本地缓存中即可。这样就能保持最新数据了。</p>
+<p>这是让缓存自动失效的方式，还有一种可以让本地缓存自动更新的方式。如Cffeine就支持可以定义一个refresh策略，他会定时的进行数据的刷新。</p>
+<h4 id="自动更新："><a href="#自动更新：" class="headerlink" title="自动更新："></a>自动更新：</h4><figure class="highlight java"><table><tr><td class="code"><pre><span class="line">Cache&lt;String, String&gt; cache = Caffeine.newBuilder()</span><br><span class="line">                .refreshAfterWrite(<span class="number">5</span>, TimeUnit.SECONDS) <span class="comment">// 设置缓存项写入后的自动刷新时间为5秒</span></span><br><span class="line">                .build(<span class="keyword">new</span> <span class="title class_">CacheLoader</span>&lt;String, String&gt;() &#123; <span class="comment">//定义一个CacheLoader，实现load方法。</span></span><br><span class="line">                 	<span class="meta">@Override</span></span><br><span class="line">                 	<span class="keyword">public</span> ListenableFuture&lt;String&gt; <span class="title function_">reload</span><span class="params">(String key, String oldValue)</span> <span class="keyword">throws</span> Exception &#123;</span><br><span class="line">                     <span class="keyword">return</span> remoteCache.get(key);</span><br><span class="line">                	&#125;</span><br><span class="line">               &#125;);</span><br></pre></td></tr></table></figure>
+
+]]></content>
+      <categories>
+        <category>本地缓存</category>
+      </categories>
   </entry>
   <entry>
     <title>双亲委派企业级应用</title>
@@ -469,6 +524,49 @@
         <tag>GC</tag>
         <tag>线上问题</tag>
       </tags>
+  </entry>
+  <entry>
+    <title>MySQL中如何查看一个 SQL 的执行耗时</title>
+    <url>/2024/02/23/%E7%9A%84%E6%89%A7%E8%A1%8C%E8%80%97%E6%97%B6/</url>
+    <content><![CDATA[<p>在 MySQL 中，有的时候我们想要知道一个 SQL 的执行耗时有多少，有些数据库管理工具客户端是可以直接返回一个执行时长的，但是，如果没有这种工具怎么办呢？如何查看一个 SQL 的耗时情况呢？</p>
+<p>有两种办法，如果是 MySQL 8.0之前，可以用SHOW PROFILES、如果是 MySQL 8.0之后的版本，可以用EXPLAIN ANALYZE</p>
+<h4 id="SHOW-PROFILES"><a href="#SHOW-PROFILES" class="headerlink" title="SHOW PROFILES"></a>SHOW PROFILES</h4><p>SHOW PROFILES 是 MySQL 提供的一种用于查看查询执行概要信息的命令。它能够显示当前会话中最近执行的 SQL 语句的性能数据，包括每条语句的执行时间和详细的执行阶段耗时。</p>
+<p>想要使用这个功能，需要先开启profiling：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">-- 启用 Profiling</span><br><span class="line">SET profiling = 1;</span><br></pre></td></tr></table></figure>
+
+
+
+<p>启动之后，执行你自己的 SQL 即可：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">-- 执行查询</span><br><span class="line">select * from t1;</span><br></pre></td></tr></table></figure>
+
+
+
+<p>之后，通过SHOW PROFILES查询概要信息：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">-- 查看 Profiles</span><br><span class="line">SHOW PROFILES;</span><br><span class="line"></span><br><span class="line">+----------+------------+------------------+                                                                                                                 </span><br><span class="line">| Query_ID | Duration   | Query            |                                                                                                                 </span><br><span class="line">+----------+------------+------------------+                                                                                                                 </span><br><span class="line">|        1 | 0.00050800 | select * from t1 |                                                                                                                 </span><br><span class="line">+----------+------------+------------------+                                                                                                                 </span><br><span class="line">1 row in set, 1 warning (0.00 sec)   </span><br></pre></td></tr></table></figure>
+
+
+
+<p>这里面显示了刚刚我们执行的SQL的执行情况，耗时是0.00050800秒。</p>
+<p>如果我们的想要查询具体某个 SQL 的耗时详细信息，也可以通过SHOW PROFILE FOR QUERY 命令：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">-- 查看特定查询的详细信息</span><br><span class="line">SHOW PROFILE FOR QUERY 1;</span><br><span class="line"></span><br><span class="line">+--------------------------------+----------+                                                                                                                </span><br><span class="line">| Status                         | Duration |                                                                                                                </span><br><span class="line">+--------------------------------+----------+                                                                                                                </span><br><span class="line">| starting                       | 0.000124 |                                                                                                                </span><br><span class="line">| Executing hook on transaction  | 0.000008 |                                                                                                                </span><br><span class="line">| starting                       | 0.000013 |                                                                                                                </span><br><span class="line">| checking permissions           | 0.000017 |                                                                                                                </span><br><span class="line">| Opening tables                 | 0.000058 |                                                                                                                </span><br><span class="line">| init                           | 0.000010 |                                                                                                                </span><br><span class="line">| System lock                    | 0.000017 |                                                                                                                </span><br><span class="line">| optimizing                     | 0.000009 |                                                                                                                </span><br><span class="line">| statistics                     | 0.000030 |                                                                                                                </span><br><span class="line">| preparing                      | 0.000036 |                                                                                                                </span><br><span class="line">| executing                      | 0.000076 |                                                                                                                </span><br><span class="line">| end                            | 0.000007 |                                                                                                                </span><br><span class="line">| query end                      | 0.000006 |                                                                                                                </span><br><span class="line">| waiting for handler commit     | 0.000017 |                                                                                                                </span><br><span class="line">| closing tables                 | 0.000016 |                                                                                                                </span><br><span class="line">| freeing items                  | 0.000044 |                                                                                                                </span><br><span class="line">| cleaning up                    | 0.000022 |                                                                                                                </span><br><span class="line">+--------------------------------+----------+                                                                                                                </span><br><span class="line">17 rows in set, 1 warning (0.00 sec) </span><br></pre></td></tr></table></figure>
+
+
+
+<p>这里详细列出了每个阶段（Status）花费的时长。可以帮助我们进行 SQL 的详细分析，其中比较重要的是以下几个：</p>
+<p>1 Opening tables：<br>如果在这个阶段花费的时间较长，可能意味着表的打开操作比较耗时，可能需要检查表的状态、文件系统性能等。</p>
+<p>2 optimizing：<br>这是查询优化的关键阶段。如果在此花费了较多时间，可能需要检查查询的复杂度和索引的使用情况。</p>
+<p>3 statistics：<br>这个阶段涉及收集表和索引的统计信息。如果时间过长，可能需要检查表的统计信息是否需要更新。</p>
+<p>4 Sending data：<br>这是查询执行的核心阶段，包含数据的读取和处理。如果在这里花费了大量时间，通常需要检查查询的效率、数据量和网络传输性能等。</p>
+<h4 id="EXPLAIN-ANALYZE"><a href="#EXPLAIN-ANALYZE" class="headerlink" title="EXPLAIN ANALYZE"></a>EXPLAIN ANALYZE</h4><p> EXPLAIN ANALYZE 是 MySQL 8.0.18 引入的一种功能，它结合了 EXPLAIN 和实际执行查询的分析结果，可以为每个执行计划的步骤提供真实的执行时间和行数。使用 EXPLAIN ANALYZE 可以帮助更准确地了解查询的性能瓶颈，并进行优化。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">explain analyze select * from t1;                                                                                                                     </span><br><span class="line">+-----------------------------------------------------------------------+         </span><br><span class="line">| EXPLAIN                                                               |         </span><br><span class="line">+-----------------------------------------------------------------------+         </span><br><span class="line">| -&gt; Table scan on t1  (cost=0.35 rows=1) (actual time=0.042..0.048 rows=1 loops=1)                                                                      |         </span><br><span class="line">+-----------------------------------------------------------------------+                                                                       </span><br><span class="line">1 row in set (0.00 sec)                                                                                                </span><br></pre></td></tr></table></figure>
+
+
+
+<p>这里的(actual time&#x3D;0.042..0.048 rows&#x3D;1 loops&#x3D;1)，表示实际执行时间和行数。actual time 显示了执行这个步骤的时间范围，rows 显示实际扫描的行数，loops 显示执行这个步骤的次数。</p>
+]]></content>
+      <categories>
+        <category>MySql</category>
+      </categories>
   </entry>
   <entry>
     <title>解决hexo + Typora 图片上传问题</title>

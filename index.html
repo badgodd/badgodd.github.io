@@ -191,6 +191,93 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2024/11/27/%E4%B8%80%E4%B8%AA%E6%9F%A5%E8%AF%A2%E8%AF%AD%E5%8F%A5%E7%9A%84%E6%89%A7%E8%A1%8C%E9%A1%BA%E5%BA%8F%E6%98%AF%E6%80%8E%E4%B9%88%E6%A0%B7%E7%9A%84/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/touxiang.jpg">
+      <meta itemprop="name" content="bad godd">
+      <meta itemprop="description" content="无问东西">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Bad Godd's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2024/11/27/%E4%B8%80%E4%B8%AA%E6%9F%A5%E8%AF%A2%E8%AF%AD%E5%8F%A5%E7%9A%84%E6%89%A7%E8%A1%8C%E9%A1%BA%E5%BA%8F%E6%98%AF%E6%80%8E%E4%B9%88%E6%A0%B7%E7%9A%84/" class="post-title-link" itemprop="url">一个查询语句的执行顺序是怎么样的</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2024-11-27 14:46:24" itemprop="dateCreated datePublished" datetime="2024-11-27T14:46:24+08:00">2024-11-27</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/mysql/" itemprop="url" rel="index"><span itemprop="name">mysql</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>1.3k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>1 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>以下是一个比较典型的查询语句，其中包含了很多子句，其中有SELECT、FROM、JOIN、WHERE、GROUP BY、HAVING、ORDER BY和LIMIT。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">SELECT name, COUNT(*)</span><br><span class="line">FROM employees</span><br><span class="line">JOIN departments ON employees.department_id = departments.id</span><br><span class="line">WHERE employees.salary &gt; 50000</span><br><span class="line">GROUP BY departments.name</span><br><span class="line">HAVING COUNT(*) &gt; 10</span><br><span class="line">ORDER BY name</span><br><span class="line">LIMIT 5;</span><br></pre></td></tr></table></figure>
+
+<p>下面是InnoDB处理SQL查询的大致执行顺序，为啥说大致呢，因为这个顺序是逻辑上的执行顺序，实际的物理执行可能会有所不同。数据库优化器可能会根据统计信息、索引、查询类型等因素以不同的方式执行查询。</p>
+<p>1 FROM：<br>○	第一步肯定要先识别出查询中涉及的所有表。<br>2 JOIN：<br>○	根据FROM子句中的表，执行JOIN操作。如果有多个JOIN，数据库会根据内部算法和统计信息确定JOIN的顺序，以尝试优化查询效率。<br>3 WHERE：<br>○	对JOIN操作的结果应用WHERE中的过滤条件。这一步会排除不符合条件的行。<br>4 GROUP BY：<br>○	如果查询包含GROUP BY子句，此时对数据进行分组。分组操作通常在WHERE条件过滤之后进行。<br>5 HAVING：<br>○	如果有HAVING子句，它会在GROUP BY之后应用。HAVING子句用于筛选分组后的数据集。<br>6 SELECT：<br>○	选择特定的列。实际上，所需列的数据可能在执行过程的早期就已经被获取，但在此阶段会根据SELECT子句确定最终输出的列。<br>7 DISTINCT：<br>○	如果指定了DISTINCT关键字，此时会去除重复的行。<br>8 ORDER BY：<br>○	如果查询指定了ORDER BY，现在将对结果进行排序。注意，如果使用了GROUP BY，MySQL可能会利用这个排序作为GROUP BY的一部分。<br>9 LIMIT：<br>○	最后，应用LIMIT子句来限制返回的行数。这通常是整个查询过程的最后一步。</p>
+<p>如上面的SQL，我们是找出平均薪水超过50,000的部门中员工人数超过10人的前5个部门，他的执行过程如下：</p>
+<p>1 FROM：<br>○	确定涉及的表：employees和departments。<br>2 JOIN：<br>○	根据employees.department_id &#x3D; departments.id条件执行JOIN操作，将两个表的数据合并。<br>3 WHERE：<br>○	应用WHERE过滤条件employees.salary &gt; 50000，只保留薪水超过50,000的员工记录。<br>4 GROUP BY：<br>○	根据departments.name对结果集进行分组。<br>5 HAVING：<br>○	应用HAVING条件COUNT(<em>) &gt; 10，筛选出员工人数超过10人的部门。<br>6 SELECT：<br>○	选择要显示的列：name（部门名称）和COUNT(</em>)（员工数量）。<br>7 DISTINCT：<br>○	此查询没有使用DISTINCT关键字，所以跳过。<br>8 ORDER BY：<br>○	根据name（部门名称）对结果集进行排序。<br>9 LIMIT：<br>○	应用LIMIT，只返回前5条记录。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2024/11/26/%E4%BB%80%E4%B9%88%E6%A0%B7%E7%9A%84%E6%9E%B6%E6%9E%84%E6%89%8D%E7%AE%97%E6%98%AF%E5%A5%BD%E7%9A%84%E6%9E%B6%E6%9E%84/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -263,6 +350,105 @@
 <p>8成本效益：架构应该是成本效益的，避免过度设计和过度工程，同时保证系统的可靠性和性能。</p>
 <p>架构，一定是服务于业务的，所以，他需要能够适应不断变化的业务需求和技术发展。同时，好的架构需要遵循良好的设计原则和软件工程实践，以确保软件的质量和可维护性。</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">架构没有好坏之分，只有适不适合，所谓好与坏只是不同的历史背景下的一个客观评判。适合的架构就是好架构。</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2024/10/05/%E5%A6%82%E4%BD%95%E4%BF%9D%E8%AF%81%E6%9C%AC%E5%9C%B0%E7%BC%93%E5%AD%98%E7%9A%84%E4%B8%80%E8%87%B4%E6%80%A7/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/touxiang.jpg">
+      <meta itemprop="name" content="bad godd">
+      <meta itemprop="description" content="无问东西">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Bad Godd's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2024/10/05/%E5%A6%82%E4%BD%95%E4%BF%9D%E8%AF%81%E6%9C%AC%E5%9C%B0%E7%BC%93%E5%AD%98%E7%9A%84%E4%B8%80%E8%87%B4%E6%80%A7/" class="post-title-link" itemprop="url">如何保证本地缓存的一致性</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2024-10-05 11:28:52" itemprop="dateCreated datePublished" datetime="2024-10-05T11:28:52+08:00">2024-10-05</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%9C%AC%E5%9C%B0%E7%BC%93%E5%AD%98/" itemprop="url" rel="index"><span itemprop="name">本地缓存</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>1.5k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>1 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>本地缓存和分布式缓存相比有很多优点，但是最大的缺点就是存在着一致性的问题。于是就衍生出这个问题：如何保证本地缓存的一致性。</p>
+<p>想要让本地缓存保持一致性，那么也就意味着，当一台机器上的本地缓存更新或者失效时，别的机器也要感知到，并且能及时处理。</p>
+<p>首先， 有一个方案，就是给本地缓存记录一个版本，当某台机器的本地缓存更新之后，把他的最新的版本号以及缓存中的数据记录到数据库中，这样，当下次有请求请求到一个未更新过本地缓存的机器时，对比一下版本号，发现版本号旧了，那么就从数据库中更新一下本地缓存。</p>
+<p>其次，借助配置中心。当某一个机器上的本地缓存发生变更之后，向配置中心做一次配置变更，然后通过配置中心把变更再推送到每一台机器上，大家监听配置变化做本地缓存的更新。</p>
+<p>另外，借助MQ的广播消息，可以实现这个功能，当有实例需要更新本地缓存的时候，发一个MQ的广播消息，然后所有实例监听到这个广播消息后，各自更新自己的本地缓存。</p>
+<p>除了数据库、广播消息和配置中心，也可以用redis，但是，这就有点脱裤子放屁了，用了本地缓存，还要去检查redis和数据库。。。</p>
+<p>其实，真正的工作中，一般来说，对于本地缓存的使用，一般都是这样的：</p>
+<p>首先，肯定是要评估数据的变化频率，对于变化不频繁的数据，才会考虑放到本地缓存中。那种频繁更新的数据，其实并不适合放到本地缓存。比如数据库的库存，你见过哪个公司秒杀是在本地缓存做的？本地缓存这么快，咋不用呢？因为他就不适合啊。</p>
+<p>还有就是，要提前评估下业务上能否接收不一致，以及能接受的不一致的时长。如果接受不了不一致，那就绝对不能用本地缓存。</p>
+<p>如果能接受，那么就基于业务上能接受的时长设置失效时长，比如业务上可以接受10分钟的延迟，那么我们可以设置个8分钟的超时时间。这样到期之后这个缓存的内容就会自动失效。</p>
+<p>在初始化缓存的时候，可以设置参数，如expireAfterAccess、expireAfterWrite、refreshAfterWrite，利用这些参数我们可以配置自动更新及自动失效。</p>
+<h4 id="自动失效："><a href="#自动失效：" class="headerlink" title="自动失效："></a>自动失效：</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Cache&lt;String, String&gt; cache = Caffeine.newBuilder()</span><br><span class="line">                .expireAfterWrite(<span class="number">5</span>, TimeUnit.SECONDS) <span class="comment">// 设置缓存项写入后的过期时间为5秒</span></span><br><span class="line">                .build();</span><br></pre></td></tr></table></figure>
+
+
+
+<p>在自动失效后，查询本地缓存就会有一次cache miss，然后下次再查询就会去分布式缓存查询，然后再缓存到本地缓存中即可。这样就能保持最新数据了。</p>
+<p>这是让缓存自动失效的方式，还有一种可以让本地缓存自动更新的方式。如Cffeine就支持可以定义一个refresh策略，他会定时的进行数据的刷新。</p>
+<h4 id="自动更新："><a href="#自动更新：" class="headerlink" title="自动更新："></a>自动更新：</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">Cache&lt;String, String&gt; cache = Caffeine.newBuilder()</span><br><span class="line">                .refreshAfterWrite(<span class="number">5</span>, TimeUnit.SECONDS) <span class="comment">// 设置缓存项写入后的自动刷新时间为5秒</span></span><br><span class="line">                .build(<span class="keyword">new</span> <span class="title class_">CacheLoader</span>&lt;String, String&gt;() &#123; <span class="comment">//定义一个CacheLoader，实现load方法。</span></span><br><span class="line">                 	<span class="meta">@Override</span></span><br><span class="line">                 	<span class="keyword">public</span> ListenableFuture&lt;String&gt; <span class="title function_">reload</span><span class="params">(String key, String oldValue)</span> <span class="keyword">throws</span> Exception &#123;</span><br><span class="line">                     <span class="keyword">return</span> remoteCache.get(key);</span><br><span class="line">                	&#125;</span><br><span class="line">               &#125;);</span><br></pre></td></tr></table></figure>
 
 
       
@@ -476,6 +662,91 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2024/05/13/MySQL%E5%81%9A%E7%B4%A2%E5%BC%95%E6%9B%B4%E6%96%B0%E7%9A%84%E6%97%B6%E5%80%99%EF%BC%8C%E4%BC%9A%E9%94%81%E8%A1%A8%E5%90%97%EF%BC%9F/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/touxiang.jpg">
+      <meta itemprop="name" content="bad godd">
+      <meta itemprop="description" content="无问东西">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Bad Godd's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2024/05/13/MySQL%E5%81%9A%E7%B4%A2%E5%BC%95%E6%9B%B4%E6%96%B0%E7%9A%84%E6%97%B6%E5%80%99%EF%BC%8C%E4%BC%9A%E9%94%81%E8%A1%A8%E5%90%97%EF%BC%9F/" class="post-title-link" itemprop="url">MySQL做索引更新的时候，会锁表吗？</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2024-05-13 22:44:56" itemprop="dateCreated datePublished" datetime="2024-05-13T22:44:56+08:00">2024-05-13</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/mysql/" itemprop="url" rel="index"><span itemprop="name">mysql</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>441</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>1 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>看版本，在MySQL 5.6版本中，已经支持了Online DDL，一般来说是不会锁表了。</p>
+<p>但是，虽然支持了Online DDL也不建议在业务高峰期做变更。因为Online DDL是尽最大可能保证DDL期间不阻塞DML动作。但是需要注意，这里说的尽最大可能意味着不是所有DDL语句都会使用OnlineDDL加速。</p>
+<p>资源争抢：而且，Online DDL 在执行过程中会占用系统资源，如 CPU、内存和 I&#x2F;O。这可能会对数据库的性能产生一定影响，尤其是在数据量较大的情况下。在非高峰期执行 DDL 变更可以减少对业务操作的干扰，避免高峰期因为资源争用而影响系统性能。</p>
+<p>也可能会锁表：虽然 Online DDL 尽可能得减少了锁表的时间，但在某些复杂操作（如涉及索引重建、大量数据的表结构更改）中，可能仍会有短暂的锁表情况。所以在非高峰期进行变更，可以降低长时间锁等待对用户请求的影响。</p>
+<p>主从延迟：在主从复制的数据库架构中，DDL 操作需要同步到从库。如果高峰期有大量写入操作，DDL 操作可能会增加主从同步延迟。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2024/03/11/%E8%AF%BB%E5%86%99%E5%88%86%E7%A6%BB%E9%81%87%E5%88%B0%E4%B8%BB%E4%BB%8E%E5%BB%B6%E8%BF%9F%E6%80%8E%E4%B9%88%E5%8A%9E/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -558,6 +829,121 @@
 <p>等 GTID 方案：和位点原理一样，MySQL 5.7.6 版本开始，允许在执行完更新类事务后，把这个事务的 GTID 返回给客户端，在执行读操作前，应用检查从库是否已经应用了该GTID标识的事务。这通常涉及查询从库的复制状态，确认已经处理的GTID集合包含了特定的GTID。</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">GTID（Global Transaction Identifier）为每个事务提供了一个全局唯一的标识符，使得主从复制过程中的数据变更能够更加精确和容易追踪。</span><br></pre></td></tr></table></figure>
 
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2024/02/23/%E7%9A%84%E6%89%A7%E8%A1%8C%E8%80%97%E6%97%B6/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/touxiang.jpg">
+      <meta itemprop="name" content="bad godd">
+      <meta itemprop="description" content="无问东西">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Bad Godd's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2024/02/23/%E7%9A%84%E6%89%A7%E8%A1%8C%E8%80%97%E6%97%B6/" class="post-title-link" itemprop="url">MySQL中如何查看一个 SQL 的执行耗时</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2024-02-23 16:37:14" itemprop="dateCreated datePublished" datetime="2024-02-23T16:37:14+08:00">2024-02-23</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySql/" itemprop="url" rel="index"><span itemprop="name">MySql</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>2.3k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>2 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>在 MySQL 中，有的时候我们想要知道一个 SQL 的执行耗时有多少，有些数据库管理工具客户端是可以直接返回一个执行时长的，但是，如果没有这种工具怎么办呢？如何查看一个 SQL 的耗时情况呢？</p>
+<p>有两种办法，如果是 MySQL 8.0之前，可以用SHOW PROFILES、如果是 MySQL 8.0之后的版本，可以用EXPLAIN ANALYZE</p>
+<h4 id="SHOW-PROFILES"><a href="#SHOW-PROFILES" class="headerlink" title="SHOW PROFILES"></a>SHOW PROFILES</h4><p>SHOW PROFILES 是 MySQL 提供的一种用于查看查询执行概要信息的命令。它能够显示当前会话中最近执行的 SQL 语句的性能数据，包括每条语句的执行时间和详细的执行阶段耗时。</p>
+<p>想要使用这个功能，需要先开启profiling：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">-- 启用 Profiling</span><br><span class="line">SET profiling = 1;</span><br></pre></td></tr></table></figure>
+
+
+
+<p>启动之后，执行你自己的 SQL 即可：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">-- 执行查询</span><br><span class="line">select * from t1;</span><br></pre></td></tr></table></figure>
+
+
+
+<p>之后，通过SHOW PROFILES查询概要信息：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">-- 查看 Profiles</span><br><span class="line">SHOW PROFILES;</span><br><span class="line"></span><br><span class="line">+----------+------------+------------------+                                                                                                                 </span><br><span class="line">| Query_ID | Duration   | Query            |                                                                                                                 </span><br><span class="line">+----------+------------+------------------+                                                                                                                 </span><br><span class="line">|        1 | 0.00050800 | select * from t1 |                                                                                                                 </span><br><span class="line">+----------+------------+------------------+                                                                                                                 </span><br><span class="line">1 row in set, 1 warning (0.00 sec)   </span><br></pre></td></tr></table></figure>
+
+
+
+<p>这里面显示了刚刚我们执行的SQL的执行情况，耗时是0.00050800秒。</p>
+<p>如果我们的想要查询具体某个 SQL 的耗时详细信息，也可以通过SHOW PROFILE FOR QUERY 命令：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">-- 查看特定查询的详细信息</span><br><span class="line">SHOW PROFILE FOR QUERY 1;</span><br><span class="line"></span><br><span class="line">+--------------------------------+----------+                                                                                                                </span><br><span class="line">| Status                         | Duration |                                                                                                                </span><br><span class="line">+--------------------------------+----------+                                                                                                                </span><br><span class="line">| starting                       | 0.000124 |                                                                                                                </span><br><span class="line">| Executing hook on transaction  | 0.000008 |                                                                                                                </span><br><span class="line">| starting                       | 0.000013 |                                                                                                                </span><br><span class="line">| checking permissions           | 0.000017 |                                                                                                                </span><br><span class="line">| Opening tables                 | 0.000058 |                                                                                                                </span><br><span class="line">| init                           | 0.000010 |                                                                                                                </span><br><span class="line">| System lock                    | 0.000017 |                                                                                                                </span><br><span class="line">| optimizing                     | 0.000009 |                                                                                                                </span><br><span class="line">| statistics                     | 0.000030 |                                                                                                                </span><br><span class="line">| preparing                      | 0.000036 |                                                                                                                </span><br><span class="line">| executing                      | 0.000076 |                                                                                                                </span><br><span class="line">| end                            | 0.000007 |                                                                                                                </span><br><span class="line">| query end                      | 0.000006 |                                                                                                                </span><br><span class="line">| waiting for handler commit     | 0.000017 |                                                                                                                </span><br><span class="line">| closing tables                 | 0.000016 |                                                                                                                </span><br><span class="line">| freeing items                  | 0.000044 |                                                                                                                </span><br><span class="line">| cleaning up                    | 0.000022 |                                                                                                                </span><br><span class="line">+--------------------------------+----------+                                                                                                                </span><br><span class="line">17 rows in set, 1 warning (0.00 sec) </span><br></pre></td></tr></table></figure>
+
+
+
+<p>这里详细列出了每个阶段（Status）花费的时长。可以帮助我们进行 SQL 的详细分析，其中比较重要的是以下几个：</p>
+<p>1 Opening tables：<br>如果在这个阶段花费的时间较长，可能意味着表的打开操作比较耗时，可能需要检查表的状态、文件系统性能等。</p>
+<p>2 optimizing：<br>这是查询优化的关键阶段。如果在此花费了较多时间，可能需要检查查询的复杂度和索引的使用情况。</p>
+<p>3 statistics：<br>这个阶段涉及收集表和索引的统计信息。如果时间过长，可能需要检查表的统计信息是否需要更新。</p>
+<p>4 Sending data：<br>这是查询执行的核心阶段，包含数据的读取和处理。如果在这里花费了大量时间，通常需要检查查询的效率、数据量和网络传输性能等。</p>
+<h4 id="EXPLAIN-ANALYZE"><a href="#EXPLAIN-ANALYZE" class="headerlink" title="EXPLAIN ANALYZE"></a>EXPLAIN ANALYZE</h4><p> EXPLAIN ANALYZE 是 MySQL 8.0.18 引入的一种功能，它结合了 EXPLAIN 和实际执行查询的分析结果，可以为每个执行计划的步骤提供真实的执行时间和行数。使用 EXPLAIN ANALYZE 可以帮助更准确地了解查询的性能瓶颈，并进行优化。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">explain analyze select * from t1;                                                                                                                     </span><br><span class="line">+-----------------------------------------------------------------------+         </span><br><span class="line">| EXPLAIN                                                               |         </span><br><span class="line">+-----------------------------------------------------------------------+         </span><br><span class="line">| -&gt; Table scan on t1  (cost=0.35 rows=1) (actual time=0.042..0.048 rows=1 loops=1)                                                                      |         </span><br><span class="line">+-----------------------------------------------------------------------+                                                                       </span><br><span class="line">1 row in set (0.00 sec)                                                                                                </span><br></pre></td></tr></table></figure>
+
+
+
+<p>这里的(actual time&#x3D;0.042..0.048 rows&#x3D;1 loops&#x3D;1)，表示实际执行时间和行数。actual time 显示了执行这个步骤的时间范围，rows 显示实际扫描的行数，loops 显示执行这个步骤的次数。</p>
 
       
     </div>
@@ -788,395 +1174,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2023/11/02/%E5%A6%82%E4%BD%95%E5%9F%BA%E4%BA%8ERedis%E5%AE%9E%E7%8E%B0%E6%BB%91%E5%8A%A8%E7%AA%97%E5%8F%A3%E9%99%90%E6%B5%81/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/touxiang.jpg">
-      <meta itemprop="name" content="bad godd">
-      <meta itemprop="description" content="无问东西">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Bad Godd's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2023/11/02/%E5%A6%82%E4%BD%95%E5%9F%BA%E4%BA%8ERedis%E5%AE%9E%E7%8E%B0%E6%BB%91%E5%8A%A8%E7%AA%97%E5%8F%A3%E9%99%90%E6%B5%81/" class="post-title-link" itemprop="url">如何基于Redis实现滑动窗口限流</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2023-11-02 22:48:47" itemprop="dateCreated datePublished" datetime="2023-11-02T22:48:47+08:00">2023-11-02</time>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>2.3k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>2 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>​		滑动窗口限流是一种流量控制策略，用于控制在一定时间内允许执行的操作数量或请求频率。它的工作方式类似于一个滑动时间窗口，在窗口内允许的操作数量是固定的，窗口会随着时间的推移不断滑动。</p>
-<p>​		滑动窗口限流的主要优点是可以在时间内平滑地控制流量，而不是简单地设置固定的请求数或速率。这使得系统可以更灵活地应对突发流量或峰值流量，而不会因为固定速率的限制而浪费资源或降低系统性能。</p>
-<p>利用Redis，我们就可以实现一个简单的滑动窗口限流的功能。因为滑动窗口和时间有关，所以很容易能想到要基于时间进行统计。</p>
-<p>那么我们只需要在每一次有请求进来的时候，记录下请求的时间戳和请求的数据，然后在统计窗口内请求的数量时，只需要统计窗口内的被记录的数据量有多少条就行了。</p>
-<p>在Redis中，我们可以基于ZSET来实现这个功能。假如我们限定login接口一分钟只能调用100次：</p>
-<p>那么，我们就可以把login接口这个需要做限流的资源名作为key在redis中进行存储，然后value我们现在ZSET这种数据结构，把他的score设置为当前请求的时间戳，member的话建议用请求的详情的hash进行存储（或者UUID、MD5什么的），避免在并发时，时间戳一致出现score和memberv一样导致被zadd幂等的问题。</p>
-<p><img src="/2023/11/02/%E5%A6%82%E4%BD%95%E5%9F%BA%E4%BA%8ERedis%E5%AE%9E%E7%8E%B0%E6%BB%91%E5%8A%A8%E7%AA%97%E5%8F%A3%E9%99%90%E6%B5%81/image-20241126170238331.png" alt="image-20241126170238331"></p>
-<p>主要步骤如下： </p>
-<p>1定义滑动窗口的时间范围，例如，窗口大小为60秒。<br>2每次收到一个请求时，我们就定义出一个zset然后存储到redis中。<br>3然后再通过ZREMRANGEBYSCORE命令来删除分值小于窗口起始时间戳（当前时间戳-60s）的数据。<br>4最后，再使用ZCARD命令来获取有序集合中的成员数量，即在窗口内的请求量。</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> redis.clients.jedis.Jedis;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">SlidingWindowRateLimiter</span> &#123;</span><br><span class="line">    <span class="keyword">private</span> Jedis jedis;</span><br><span class="line">    <span class="keyword">private</span> String key;</span><br><span class="line">    <span class="keyword">private</span> <span class="type">int</span> limit;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="type">boolean</span> <span class="title function_">allowRequest</span><span class="params">(String key)</span> &#123;</span><br><span class="line">        <span class="comment">//当前时间戳</span></span><br><span class="line">        <span class="type">long</span> <span class="variable">currentTime</span> <span class="operator">=</span> System.currentTimeMillis();</span><br><span class="line">        <span class="comment">//窗口开始时间是当前时间减60s</span></span><br><span class="line">        <span class="type">long</span> <span class="variable">windowStart</span> <span class="operator">=</span> currentTime - <span class="number">60</span> * <span class="number">1000</span>;</span><br><span class="line">        <span class="comment">//删除窗口开始时间之前的所有数据</span></span><br><span class="line">        jedis.zremrangeByScore(key, <span class="string">&quot;-inf&quot;</span>, String.valueOf(windowStart));</span><br><span class="line">        <span class="comment">//计算总请求数</span></span><br><span class="line">        <span class="type">long</span> <span class="variable">currentRequests</span> <span class="operator">=</span> jedis.zcard(key);</span><br><span class="line">    	<span class="comment">//窗口足够则把当前请求加入</span></span><br><span class="line">        <span class="keyword">if</span> (currentRequests &lt; limit) &#123;</span><br><span class="line">            jedis.zadd(key, currentTime, String.valueOf(currentTime));</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-
-
-<p>以上代码在高并发情况下，可能会存在原子性的问题，需要考虑加事务或者lua脚本：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> redis.clients.jedis.Jedis;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">SlidingWindowRateLimiter</span> &#123;</span><br><span class="line">    <span class="keyword">private</span> Jedis jedis;</span><br><span class="line">    <span class="keyword">private</span> String key;</span><br><span class="line">    <span class="keyword">private</span> <span class="type">int</span> limit;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="title function_">SlidingWindowRateLimiter</span><span class="params">(Jedis jedis, String key, <span class="type">int</span> limit)</span> &#123;</span><br><span class="line">        <span class="built_in">this</span>.jedis = jedis;</span><br><span class="line">        <span class="built_in">this</span>.key = key;</span><br><span class="line">        <span class="built_in">this</span>.limit = limit;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="type">boolean</span> <span class="title function_">allowRequest</span><span class="params">(String key)</span> &#123;</span><br><span class="line">        <span class="comment">// 当前时间戳</span></span><br><span class="line">        <span class="type">long</span> <span class="variable">currentTime</span> <span class="operator">=</span> System.currentTimeMillis();</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 使用Lua脚本来确保原子性操作</span></span><br><span class="line">        <span class="type">String</span> <span class="variable">luaScript</span> <span class="operator">=</span> <span class="string">&quot;local window_start = ARGV[1] - 60000\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;redis.call(&#x27;ZREMRANGEBYSCORE&#x27;, KEYS[1], &#x27;-inf&#x27;, window_start)\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;local current_requests = redis.call(&#x27;ZCARD&#x27;, KEYS[1])\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;if current_requests &lt; tonumber(ARGV[2]) then\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;    redis.call(&#x27;ZADD&#x27;, KEYS[1], ARGV[1], ARGV[1])\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;    return 1\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;else\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;    return 0\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;end&quot;</span>;</span><br><span class="line"></span><br><span class="line">        <span class="type">Object</span> <span class="variable">result</span> <span class="operator">=</span> jedis.eval(luaScript, <span class="number">1</span>, key, String.valueOf(currentTime), String.valueOf(limit));</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">return</span> (Long) result == <span class="number">1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2023/07/31/%E5%BC%95%E5%85%A5%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81%E8%A7%A3%E5%86%B3%E5%B9%B6%E5%8F%91%E9%97%AE%E9%A2%98/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/touxiang.jpg">
-      <meta itemprop="name" content="bad godd">
-      <meta itemprop="description" content="无问东西">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Bad Godd's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2023/07/31/%E5%BC%95%E5%85%A5%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81%E8%A7%A3%E5%86%B3%E5%B9%B6%E5%8F%91%E9%97%AE%E9%A2%98/" class="post-title-link" itemprop="url">引入分布式锁解决并发问题</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2023-07-31 10:48:47" itemprop="dateCreated datePublished" datetime="2023-07-31T10:48:47+08:00">2023-07-31</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/JUC/" itemprop="url" rel="index"><span itemprop="name">JUC</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>896</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h4 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h4><p>我的项目中，有一个场景会出现并发问题，就是我们有一个支付单，这个支付单会有到期的自动关闭，以及用户也可以主动取消订单进行关闭。</p>
-<p>这两个操作，有的时候就会出现并发的问题，导致重复关单，重复发消息给下游，导致下游处理失败。</p>
-<p>为了解决这个并发的问题，我在项目中采用了分布式锁来解决。</p>
-<h4 id="技术选型"><a href="#技术选型" class="headerlink" title="技术选型"></a>技术选型</h4><p>其实分布式锁有很多种方案，无非就是借助一个第三方的系统，来做互斥性的协调。那么市面上主流的实现方式就是基于数据库、zookeeper以及redis。</p>
-<p>我在选型的时候分别了解了一下这几个方案。</p>
-<p>其实最简单的肯定是数据库的方式，在数据库中建一张表，加锁时创建一条记录，解锁时再把记录删除，通过唯一性约束来避免重复的记录。当要加锁的时候，判断下数据库中是否已经有这条记录了，没有就插入一条。</p>
-<p>这个方案的话好处就是实现简单，缺点也比较明显，就是太依赖数据库，在高并发情况下，可能会对数据库造成压力，并且性能也不太好，而且也会占用很多数据库链接，影响正常的业务。</p>
-<p>基于数据库的悲观锁当然也可以实现，但是悲观锁的机制，可能会导致锁表，也会导致线程阻塞的问题，所以这个方案我也放弃了。</p>
-<p>另外在zookeeper和redis中，我选择了redis，因为redis我们现在系统中已经在用了，但是zk的话我们没有引入，并且搭建一个zk集群成本也挺高的。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">在redis中呢，我们最开始使用了setnx的方案，但是后来经常会出现并发问题，后来发现是因为有的时候，我们设置的解锁的超时时间太短了，导致锁提前释放了。但是拉长超时时间又会使得接口的吞吐量降低，后来我发现redisson其实他实现了看门狗的机制，可以帮助我们做自动续期，我就选了redisson的方案。</span><br></pre></td></tr></table></figure>
-
-<p>但是，其实现在我们这个方案也存在一定的问题，那就是在redis的主节点如果出现问题的情况下，可能会导致锁丢失，但是因为我们这个目前业务量还没有那么大，所以暂时还没有遇到这个问题，不过我也了解过，其实可以基于redlock来解决这个问题，redlock可以借助集群的投票机制，超过半数以上写入成功才算加锁成功，这样可解决单点故障的问题。后面会考虑优化一下。</p>
-<h4 id="得到的结果"><a href="#得到的结果" class="headerlink" title="得到的结果"></a>得到的结果</h4><p>解决了并发的问题</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2023/07/26/%E4%BD%BF%E7%94%A8CompletableFuture%E5%AE%8C%E6%88%90%E5%B9%B6%E5%8F%91%E7%BC%96%E6%8E%92%EF%BC%8C%E6%8F%90%E5%8D%87%E6%8E%A5%E5%8F%A3%E6%80%A7%E8%83%BD/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/touxiang.jpg">
-      <meta itemprop="name" content="bad godd">
-      <meta itemprop="description" content="无问东西">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Bad Godd's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2023/07/26/%E4%BD%BF%E7%94%A8CompletableFuture%E5%AE%8C%E6%88%90%E5%B9%B6%E5%8F%91%E7%BC%96%E6%8E%92%EF%BC%8C%E6%8F%90%E5%8D%87%E6%8E%A5%E5%8F%A3%E6%80%A7%E8%83%BD/" class="post-title-link" itemprop="url">使用CompletableFuture完成并发编排，提升接口性能</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2023-07-26 15:48:47" itemprop="dateCreated datePublished" datetime="2023-07-26T15:48:47+08:00">2023-07-26</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/JUC/" itemprop="url" rel="index"><span itemprop="name">JUC</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>877</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h4 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h4><p>我的项目中，有这样一个场景，我们要发起一个用户主动还款之后，需要把在途的扣款单全部暂停，但是因为用户选择还款单据可能比较多，而且暂停是调用外部资金打款系统的接口实现的，这个地方如果一条一条执行就很慢，但是如果起多线程执行的话，我就没办法知道他们每一个暂定的返回结果。</p>
-<p>我想可以实现一个这样的功能：多线程去执行暂停动作，如果都成功了，那么就推进我的主动扣款后续流程，如果暂停有任何一个接口调用失败了，那么先不推进后续流程，等下次重试。</p>
-<p> 技术选型 </p>
-<p>为了实现这个功能，我了解到CompletableFuture，他是Java 8中引入的一个新特性，它提供了一种简单的方法来实现异步编程和任务组合。</p>
-<p>他的多线程编排的能力刚好可以用在我这个场景中，而且他底层是基于ForkJoinPool实现的，所以他的性能也比较高效，所以最终我选择了这个方案。</p>
-<h4 id="具体实现"><a href="#具体实现" class="headerlink" title="具体实现"></a>具体实现</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//异步暂停扣款</span></span><br><span class="line">CompletableFuture&lt;Void&gt; allFutures = CompletableFuture.allOf(noticeDetails.stream()</span><br><span class="line">        .map(detail -&gt; CompletableFuture.supplyAsync(() -&gt; &#123;</span><br><span class="line">            pause(detail);</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">        &#125;)).toArray(CompletableFuture[]::<span class="keyword">new</span>));</span><br><span class="line"></span><br><span class="line"><span class="comment">//所有暂停扣款成功后，更新代还通知单</span></span><br><span class="line">allFutures.whenComplete((v, e) -&gt; &#123;</span><br><span class="line">    <span class="keyword">if</span> (e == <span class="literal">null</span>) &#123;</span><br><span class="line">        <span class="comment">//执行后续的还款操作</span></span><br><span class="line">        <span class="comment">//...</span></span><br><span class="line">        <span class="comment">//...</span></span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        log.error(<span class="string">&quot;notice failed&quot;</span>, e);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
-
-
-
-<h4 id="得到结果"><a href="#得到结果" class="headerlink" title="得到结果"></a>得到结果</h4><p>在用了CompletableFuture做编排之前，原来50笔订单的暂停扣款，需要大概10s左右，但是用了CompletableFuture之后，50笔订单的暂停扣款只需要1秒钟左右。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2023/06/11/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98FullGC/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/touxiang.jpg">
-      <meta itemprop="name" content="bad godd">
-      <meta itemprop="description" content="无问东西">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Bad Godd's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2023/06/11/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98FullGC/" class="post-title-link" itemprop="url">线上问题FullGC</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2023-06-11 21:18:09" itemprop="dateCreated datePublished" datetime="2023-06-11T21:18:09+08:00">2023-06-11</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/JVM/" itemprop="url" rel="index"><span itemprop="name">JVM</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>2.4k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>2 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="背景知识-background"><a href="#背景知识-background" class="headerlink" title="背景知识 (background)"></a>背景知识 (background)</h2><p>​	FullGC通常伴随着比较久的停顿和性能退化，不过不同GC算法关注点不一样。</p>
-<p>​	对CMS来说，FullGC是比较正常的，每次STW也比较短，但频繁的话会导致吞吐量下降，因此重点考察CMS FullGC的频率，目前1分钟超过12次就报警。</p>
-<p>​	CMS分两种模式：Background和Foreground，严格来说，Foreground才算FullGC。Foreground在Promotion Failed、Concurrent Mode Failure等条件下触发，是单线程串行回收的，对整个老年代进行清理、压缩，消除内存碎片，STW 时间长，有时会长达十几秒。Background是正常情况下触发的并发回收的 CMS GC，停顿非常短，对业务影响很小。</p>
-<p>​	对G1来说，FullGC对整个堆(Young+Old Generation)进行清理，通常意味着更大的停顿时长，是我们要竭力避免的，因此出现一次就报警。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">FullGC报警是针对老年代的GC频率，我们有单独的GC耗时报警用于捕捉停顿较久的场景。</span><br></pre></td></tr></table></figure>
-
-<h3 id="查看指标-dashboard"><a href="#查看指标-dashboard" class="headerlink" title="查看指标 (dashboard)"></a>查看指标 (dashboard)</h3><p>展开: JVM &#x2F; 内存 &#x2F; GC &#x2F; <a target="_blank" rel="noopener" href="https://so.csdn.net/so/search?q=ClassLoader&spm=1001.2101.3001.7020">ClassLoader</a>这一行，找到监控面板：GC耗时和 GC原因与频次。</p>
-<p><img src="/2023/06/11/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98FullGC/image-20231011192636268.png" alt="image-20231011192636268"></p>
-<h3 id="止损措施-action"><a href="#止损措施-action" class="headerlink" title="止损措施 (action)"></a>止损措施 (action)</h3><p>FullGC发生时，已产生负面影响。如果集中在单个节点，可考虑摘流或者调小节点权重。</p>
-<p>建议关注Old区的增长，在下次FullGC前，<code>先手动摘流，然后Dump堆内存</code>。</p>
-<h3 id="事后改进-postmortem"><a href="#事后改进-postmortem" class="headerlink" title="事后改进(postmortem)"></a>事后改进(postmortem)</h3><p>FullGC通常是老年代内存不足，放不下新晋升的对象。</p>
-<p>大概率是代码的内存开销太大，比如全量或大批量加载数据、导入导出&#x2F;上传下载等。</p>
-<p>可通过慢接口、慢查询、AccessLog 、 应用日志等初步筛选可疑接口，优化逻辑，确保单次执行的资源开销是稳定的、高效的。</p>
-<p>除此之外，请参考原因(cause)部分，针对当前业务调优GC参数，建议每次只调整一个变量，灰度观察。</p>
-<p>GC优化后，通过所选时段内累计GC耗时计算GC耗时在所选时段内的占比是否下降，所选时段内累计GC次数查看所选时段内各类型GC的次数是否有变化。优先GC耗时下降，GC频率仅做参考。</p>
-<h2 id="可能的原因-cause"><a href="#可能的原因-cause" class="headerlink" title="可能的原因 (cause)"></a>可能的原因 (cause)</h2><p>Old区通常是是生命周期比较久的对象，比如本地缓存、各种连接池的连接、监控指标、全局对象等。</p>
-<p>处理这种问题，可在Old区GC前后分别Dump内存(先摘流)，借助MAT进行内存&#x2F;对象Diff，按照对象、类、类加载器、包等多个维度观察 Histogram，分析 Unreachable。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Unreachable是可回收的对象，可用于判断某些对象是否生成过多。</span><br></pre></td></tr></table></figure>
-
-<h4 id="一、过早晋升-Premature-Promotion"><a href="#一、过早晋升-Premature-Promotion" class="headerlink" title="一、过早晋升(Premature Promotion)"></a>一、过早晋升(Premature Promotion)</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">过早晋升通常以CMS+Parnew组合居多，G1的话，建议勿指定新生代大小(-Xmn)。</span><br></pre></td></tr></table></figure>
-
-<p>​	临时对象经过几次 Young GC后才会晋升到 Old 区，每复制到survivor区一次， GC Age 就会增长 1，最大Age通过 -XX:MaxTenuringThreshold 来控制。</p>
-<p>过早晋升一般不会直接影响 GC，常伴随着浮动垃圾、大对象担保失败等问题，我们通过以下方式交叉验证：</p>
-<p>JVM内存池里的指标Old Gen(heap)经过一次GC回收后，内存占用下降了很多，可比较 max &#x2F; min，比如，max 值为 2.5G ，GC后只剩下了 500 M，那说明，只有500MB活跃对象，其余的都被回收了。<br>GC 内存分配里新生代每秒增加的字节(申请的内存)过大，同时有很多对象晋升到了老年代(每秒新增字节)。老年代晋升的越多，就可能有过早晋升的问题。<br>查看节点的GC日志，查看对象晋升的threshold，类似new threshold 1(max 6)，说明只回收了一次就晋升了。<br>过早晋升，会增加Old区的内存占用，触发频繁的Full GC，降低吞吐量。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Old区占用超过某个阈值(+XX:CMSInitiatingOccupancyFraction/+XX:InitiatingHeapOccupancyPercent)时，CMS会触发 Background GC，G1会触发mixed gc。</span><br></pre></td></tr></table></figure>
-
-<p>​	常见原因是新生代(Young&#x2F;Eden区)过小，Young区被快速填满，本该回收的对象参与了 GC并晋升。另外，无法及时回收的对象还会影响-XX:MaxTenuringThreshold的动态计算，导致 threshold 变小 ，更多的临时对象进入了 Old 区，造成资源浪费。</p>
-<p>JVM内存池里的指标Eden Gen(heap)的max即 Young区的最大值，可适当调大观察效果。</p>
-<p>若在总的Heap内存不变的情况下调大Young区，可适当调小Old区，但考虑到浮动垃圾，建议Old区大小为一轮回收后Old区活跃对象的3倍左右。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">注意，调大Young区对ParNew来说每次GC Copy的对象更多了，虽然会降低GC次数，但可能增加单次GC耗时，可参考所选时段总耗时来决定优化是否有效。</span><br></pre></td></tr></table></figure>
-
-<p>除了Young区小之外，也可能是内存分配压力大，可通过<code>JVM / 内存 / GC / ClassLoader</code>里的GC内存分配面板来验证。</p>
-<p><img src="/2023/06/11/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98FullGC/image-20231011192908088.png" alt="image-20231011192908088"></p>
-<p>内存分配速率，如果是偶发的毛刺、突增，通常是业务代码加载了大批数据，可配合MAT等工具分析内存、优化代码；如果持续比较大，那说明内存不够用了，只能申请套餐扩容或者尝试G1。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">开发可筛选时间段内的慢请求、AccessLog、应用日志，缩小排查范围；尽可能保证接口内存开销的稳定性，避免浪费资源。</span><br></pre></td></tr></table></figure>
-
-<p>内存分配速率越大，GC越频繁，两次 Young GC 的间隔时间尽量大于接口P99.9的时间，这样尽量让对象在 Young 区就被回收，可以减少很多停顿。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">慢请求不只是对线程池/资源池的挤占，在多次GC期间不能被回收的垃圾就转移到Old区了。</span><br></pre></td></tr></table></figure>
-
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1248,14 +1245,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">16</span>
+          <span class="site-state-item-count">20</span>
           <span class="site-state-item-name">博客</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">6</span>
+        <span class="site-state-item-count">9</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
