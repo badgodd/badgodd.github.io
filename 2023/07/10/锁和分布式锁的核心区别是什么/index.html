@@ -20,19 +20,19 @@
     var CONFIG = {"hostname":"badgodd.github.io","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
-  <meta name="description" content="一般来说，为了减少主从延迟带来的影响，我们在实现读写分离时，可以采用以下几种方案做优化。 读请求分类一般来说，虽然我们做了读写分离，但是也不是无脑分的，我们还会把读请求分成两类，一类是可以接受延迟的读，一类是不能接受延迟的读。 比如历史订单的查询、比如数据报表的生成、比如数据对账的查询、比如非关键业务的查询，比如评论信息等，这些都是可以延迟的读，这些读的话就可以完全从备库走。 而对于那些不能接受延">
+  <meta name="description" content="锁和分布式锁的核心区别主要在于作用范围和适用场景。 锁，我们常用的就是synchronized，ReentrantLock等，他们通常是在单个进程内起作用的同步机制，用于控制对共享资源的访问。多个线程或进程之间可以使用锁来确保对关键资源的互斥访问。 这种锁，主要适用于单体应用，确保在同一JVM进程内多个线程同步共享资源的访问。 分布式锁，作用范围更广泛，可以跨越多个计算机或多个进程，用于协调分布式">
 <meta property="og:type" content="article">
-<meta property="og:title" content="读写分离遇到主从延迟怎么办">
-<meta property="og:url" content="https://badgodd.github.io/2024/03/11/%E8%AF%BB%E5%86%99%E5%88%86%E7%A6%BB%E9%81%87%E5%88%B0%E4%B8%BB%E4%BB%8E%E5%BB%B6%E8%BF%9F%E6%80%8E%E4%B9%88%E5%8A%9E/index.html">
+<meta property="og:title" content="锁和分布式锁的核心区别是什么">
+<meta property="og:url" content="https://badgodd.github.io/2023/07/10/%E9%94%81%E5%92%8C%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81%E7%9A%84%E6%A0%B8%E5%BF%83%E5%8C%BA%E5%88%AB%E6%98%AF%E4%BB%80%E4%B9%88/index.html">
 <meta property="og:site_name" content="Bad Godd&#39;s Blog">
-<meta property="og:description" content="一般来说，为了减少主从延迟带来的影响，我们在实现读写分离时，可以采用以下几种方案做优化。 读请求分类一般来说，虽然我们做了读写分离，但是也不是无脑分的，我们还会把读请求分成两类，一类是可以接受延迟的读，一类是不能接受延迟的读。 比如历史订单的查询、比如数据报表的生成、比如数据对账的查询、比如非关键业务的查询，比如评论信息等，这些都是可以延迟的读，这些读的话就可以完全从备库走。 而对于那些不能接受延">
+<meta property="og:description" content="锁和分布式锁的核心区别主要在于作用范围和适用场景。 锁，我们常用的就是synchronized，ReentrantLock等，他们通常是在单个进程内起作用的同步机制，用于控制对共享资源的访问。多个线程或进程之间可以使用锁来确保对关键资源的互斥访问。 这种锁，主要适用于单体应用，确保在同一JVM进程内多个线程同步共享资源的访问。 分布式锁，作用范围更广泛，可以跨越多个计算机或多个进程，用于协调分布式">
 <meta property="og:locale" content="zh_CN">
-<meta property="article:published_time" content="2024-03-10T17:35:04.000Z">
-<meta property="article:modified_time" content="2024-11-26T09:37:35.674Z">
+<meta property="article:published_time" content="2023-07-10T15:16:46.000Z">
+<meta property="article:modified_time" content="2024-11-28T09:18:38.208Z">
 <meta property="article:author" content="bad godd">
 <meta name="twitter:card" content="summary">
 
-<link rel="canonical" href="https://badgodd.github.io/2024/03/11/%E8%AF%BB%E5%86%99%E5%88%86%E7%A6%BB%E9%81%87%E5%88%B0%E4%B8%BB%E4%BB%8E%E5%BB%B6%E8%BF%9F%E6%80%8E%E4%B9%88%E5%8A%9E/">
+<link rel="canonical" href="https://badgodd.github.io/2023/07/10/%E9%94%81%E5%92%8C%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81%E7%9A%84%E6%A0%B8%E5%BF%83%E5%8C%BA%E5%88%AB%E6%98%AF%E4%BB%80%E4%B9%88/">
 
 
 <script id="page-configurations">
@@ -45,7 +45,7 @@
   };
 </script>
 
-  <title>读写分离遇到主从延迟怎么办 | Bad Godd's Blog</title>
+  <title>锁和分布式锁的核心区别是什么 | Bad Godd's Blog</title>
   
 
 
@@ -194,7 +194,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2024/03/11/%E8%AF%BB%E5%86%99%E5%88%86%E7%A6%BB%E9%81%87%E5%88%B0%E4%B8%BB%E4%BB%8E%E5%BB%B6%E8%BF%9F%E6%80%8E%E4%B9%88%E5%8A%9E/">
+    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2023/07/10/%E9%94%81%E5%92%8C%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81%E7%9A%84%E6%A0%B8%E5%BF%83%E5%8C%BA%E5%88%AB%E6%98%AF%E4%BB%80%E4%B9%88/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/touxiang.jpg">
@@ -207,7 +207,7 @@
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
-          读写分离遇到主从延迟怎么办
+          锁和分布式锁的核心区别是什么
         </h1>
 
         <div class="post-meta">
@@ -217,7 +217,7 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2024-03-11 01:35:04" itemprop="dateCreated datePublished" datetime="2024-03-11T01:35:04+08:00">2024-03-11</time>
+              <time title="创建时间：2023-07-10 23:16:46" itemprop="dateCreated datePublished" datetime="2023-07-10T23:16:46+08:00">2023-07-10</time>
             </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -225,7 +225,7 @@
               </span>
               <span class="post-meta-item-text">分类于</span>
                 <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E9%AB%98%E6%80%A7%E8%83%BD/" itemprop="url" rel="index"><span itemprop="name">高性能</span></a>
+                  <a href="/categories/%E5%88%86%E5%B8%83%E5%BC%8F/" itemprop="url" rel="index"><span itemprop="name">分布式</span></a>
                 </span>
             </span>
 
@@ -235,7 +235,7 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>1.4k</span>
+              <span>406</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
@@ -254,27 +254,12 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <p>一般来说，为了减少主从延迟带来的影响，我们在实现读写分离时，可以采用以下几种方案做优化。</p>
-<h4 id="读请求分类"><a href="#读请求分类" class="headerlink" title="读请求分类"></a>读请求分类</h4><p>一般来说，虽然我们做了读写分离，但是也不是无脑分的，我们还会把读请求分成两类，一类是可以接受延迟的读，一类是不能接受延迟的读。</p>
-<p>比如历史订单的查询、比如数据报表的生成、比如数据对账的查询、比如非关键业务的查询，比如评论信息等，这些都是可以延迟的读，这些读的话就可以完全从备库走。</p>
-<p>而对于那些不能接受延迟的读，那么就需要注意了，就需要考虑进行强制读主库。</p>
-<p>这种方案其实是用的比较多的，不要以为他是逃避了问题，有的时候，没必要给自己创造困难硬上！</p>
-<h4 id="强制读主库"><a href="#强制读主库" class="headerlink" title="强制读主库"></a>强制读主库</h4><p>上面我们提到了对于一些不能接受延迟的读请求，需要强制走主库。</p>
-<p>还有一些情况，那就是一些核心的业务操作，或者是在一个事务上下文中的读请求，这时候也需要读主库的。</p>
-<p>比如说我在创建订单的过程中，我会先插入一个订单，然后再查询订单信息进行后续操作，这个过程中，是要保证数据一定能查到的，这时候就也需要强制走主库。</p>
-<p>具体如何实现强制读主库呢，如果是我们前面介绍的通过自己写代码分流的方案的话，就比较容易了，我们可以自己控制读写哪个数据源，那么就自己硬编码就好了。</p>
-<p>如果是使用我推荐的中间件的方案的话，比如ShardingJDBC，他也是支持强制路由的（<a target="_blank" rel="noopener" href="https://shardingsphere.apache.org/document/legacy/3.x/document/cn/manual/sharding-jdbc/usage/hint/">https://shardingsphere.apache.org/document/legacy/3.x/document/cn/manual/sharding-jdbc/usage/hint/</a> ），可以通过设置hint的方式让SQL只操作主库。</p>
-<h4 id="二次读取"><a href="#二次读取" class="headerlink" title="二次读取"></a>二次读取</h4><p>除了上面我们说的强制读主库的方案，还有一个常见做法叫做二次读取。</p>
-<p>啥意思呢，就是我的读取操作，默认读从库，但是如果我从库读取的时候没读到，那我为了避免因为数据延迟导致的，那么就再进行一次从主库读取。</p>
-<p>这个实现方式的话也是需要我们定制的开发代码。但是这个方案我不太建议，因为这种一旦出现延迟，也会导致你的主库会有大量的请求过去，造成很大的压力的。</p>
-<h4 id="主备一致"><a href="#主备一致" class="headerlink" title="主备一致"></a>主备一致</h4><p>除了上面说的方案之外，还有一些场景中，是采用了一些特殊的手段，来确保主备一致。</p>
-<p>比如在极客时间的《MySQL 45讲》中，作者提到过一些方案（但是其实用的都不多，还是前面说的几个方案更多一点）：</p>
-<p>Sleep方案：就是主库更新之后，读从库之前先sleep 1秒，然后再读从库。</p>
-<p>判断主备无延迟方案：每次从库执行查询请求前，先判断 seconds_behind_master 是否已经等于 0。如果还不等于 0 ，那就必须等到这个参数变为 0 才能执行查询请求。</p>
-<p>等主库位点方案：其核心思想是在从库上执行读操作前，确保从库已经同步了特定的主库位点（即主库的数据变更位置）。这样可以保证读操作获取的数据是最新的，避免了因主从复制延迟而导致的数据不一致问题。</p>
-<p>等 GTID 方案：和位点原理一样，MySQL 5.7.6 版本开始，允许在执行完更新类事务后，把这个事务的 GTID 返回给客户端，在执行读操作前，应用检查从库是否已经应用了该GTID标识的事务。这通常涉及查询从库的复制状态，确认已经处理的GTID集合包含了特定的GTID。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">GTID（Global Transaction Identifier）为每个事务提供了一个全局唯一的标识符，使得主从复制过程中的数据变更能够更加精确和容易追踪。</span><br></pre></td></tr></table></figure>
-
+        <p>锁和分布式锁的核心区别主要在于作用范围和适用场景。</p>
+<p>锁，我们常用的就是synchronized，ReentrantLock等，他们通常是在单个进程内起作用的同步机制，用于控制对共享资源的访问。多个线程或进程之间可以使用锁来确保对关键资源的互斥访问。</p>
+<p>这种锁，主要适用于单体应用，确保在同一JVM进程内多个线程同步共享资源的访问。</p>
+<p>分布式锁，作用范围更广泛，可以跨越多个计算机或多个进程，用于协调分布式系统中的不同节点，以确保在全局范围内对共享资源的互斥访问。</p>
+<p>分布式锁适用于分布式系统中，各个节点之间需要协调共享资源访问的情况。在分布式环境中，传统的锁机制可能无法有效地处理多节点之间的同步问题，因此需要分布式锁来确保一致性。</p>
+<p>所以，普通的锁主要用于单机环境，用于控制同一JVM进程中多个线程对共享资源的互斥访问。而分布式锁则适用于分布式环境，用于协调多个计算机或多个进程之间对共享资源的互斥访问，确保分布式系统的一致性。</p>
 
     </div>
 
@@ -290,7 +275,7 @@
   </li>
   <li class="post-copyright-link">
     <strong>本文链接：</strong>
-    <a href="https://badgodd.github.io/2024/03/11/%E8%AF%BB%E5%86%99%E5%88%86%E7%A6%BB%E9%81%87%E5%88%B0%E4%B8%BB%E4%BB%8E%E5%BB%B6%E8%BF%9F%E6%80%8E%E4%B9%88%E5%8A%9E/" title="读写分离遇到主从延迟怎么办">https://badgodd.github.io/2024/03/11/读写分离遇到主从延迟怎么办/</a>
+    <a href="https://badgodd.github.io/2023/07/10/%E9%94%81%E5%92%8C%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81%E7%9A%84%E6%A0%B8%E5%BF%83%E5%8C%BA%E5%88%AB%E6%98%AF%E4%BB%80%E4%B9%88/" title="锁和分布式锁的核心区别是什么">https://badgodd.github.io/2023/07/10/锁和分布式锁的核心区别是什么/</a>
   </li>
   <li class="post-copyright-license">
     <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/zh-CN" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
@@ -307,12 +292,12 @@
         
     <div class="post-nav">
       <div class="post-nav-item">
-    <a href="/2024/02/23/%E7%9A%84%E6%89%A7%E8%A1%8C%E8%80%97%E6%97%B6/" rel="prev" title="MySQL中如何查看一个 SQL 的执行耗时">
-      <i class="fa fa-chevron-left"></i> MySQL中如何查看一个 SQL 的执行耗时
+    <a href="/2023/06/27/%E4%B8%80%E4%B8%AA%E6%9F%A5%E8%AF%A2%E8%AF%AD%E5%8F%A5%E7%9A%84%E6%89%A7%E8%A1%8C%E9%A1%BA%E5%BA%8F%E6%98%AF%E6%80%8E%E4%B9%88%E6%A0%B7%E7%9A%84/" rel="prev" title="一个查询语句的执行顺序是怎么样的">
+      <i class="fa fa-chevron-left"></i> 一个查询语句的执行顺序是怎么样的
     </a></div>
       <div class="post-nav-item">
-    <a href="/2024/04/28/TCC%E7%9A%84%E7%A9%BA%E5%9B%9E%E6%BB%9A%E5%92%8C%E6%82%AC%E6%8C%82%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%9F%E5%A6%82%E4%BD%95%E8%A7%A3%E5%86%B3/" rel="next" title="TCC的空回滚和悬挂是什么？如何解决">
-      TCC的空回滚和悬挂是什么？如何解决 <i class="fa fa-chevron-right"></i>
+    <a href="/2023/07/26/%E4%BD%BF%E7%94%A8CompletableFuture%E5%AE%8C%E6%88%90%E5%B9%B6%E5%8F%91%E7%BC%96%E6%8E%92%EF%BC%8C%E6%8F%90%E5%8D%87%E6%8E%A5%E5%8F%A3%E6%80%A7%E8%83%BD/" rel="next" title="使用CompletableFuture完成并发编排，提升接口性能">
+      使用CompletableFuture完成并发编排，提升接口性能 <i class="fa fa-chevron-right"></i>
     </a></div>
     </div>
       </footer>
@@ -372,7 +357,6 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%AF%BB%E8%AF%B7%E6%B1%82%E5%88%86%E7%B1%BB"><span class="nav-number">1.</span> <span class="nav-text">读请求分类</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%BC%BA%E5%88%B6%E8%AF%BB%E4%B8%BB%E5%BA%93"><span class="nav-number">2.</span> <span class="nav-text">强制读主库</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%BA%8C%E6%AC%A1%E8%AF%BB%E5%8F%96"><span class="nav-number">3.</span> <span class="nav-text">二次读取</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%BB%E5%A4%87%E4%B8%80%E8%87%B4"><span class="nav-number">4.</span> <span class="nav-text">主备一致</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 

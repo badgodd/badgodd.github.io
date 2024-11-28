@@ -191,6 +191,109 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2023/12/17/Redisson%E7%9A%84watchdog%E6%9C%BA%E5%88%B6%E6%98%AF%E6%80%8E%E4%B9%88%E6%A0%B7%E7%9A%84%EF%BC%9F/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/touxiang.jpg">
+      <meta itemprop="name" content="bad godd">
+      <meta itemprop="description" content="无问东西">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Bad Godd's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2023/12/17/Redisson%E7%9A%84watchdog%E6%9C%BA%E5%88%B6%E6%98%AF%E6%80%8E%E4%B9%88%E6%A0%B7%E7%9A%84%EF%BC%9F/" class="post-title-link" itemprop="url">Redisson的watchdog机制是怎么样的？</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2023-12-17 13:34:08" itemprop="dateCreated datePublished" datetime="2023-12-17T13:34:08+08:00">2023-12-17</time>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>6.6k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>6 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>为了避免Redis实现的分布式锁超时，Redisson中引入了watch dog的机制，他可以帮助我们在Redisson实例被关闭前，不断的延长锁的有效期。</p>
+<p>自动续租：当一个Redisson客户端实例获取到一个分布式锁时，如果没有指定锁的超时时间，Watchdog会基于Netty的时间轮启动一个后台任务，定期向Redis发送命令，重新设置锁的过期时间，通常是锁的租约时间的1&#x2F;3。这确保了即使客户端处理时间较长，所持有的锁也不会过期。<br>续期时长：默认情况下，每10s钟做一次续期，续期时长是30s。<br>停止续期：当锁被释放或者客户端实例被关闭时，Watchdog会自动停止对应锁的续租任务。</p>
+<p>在Redisson中，watch dog的主要实现在<a target="_blank" rel="noopener" href="https://github.com/redisson/redisson/blob/master/redisson/src/main/java/org/redisson/RedissonBaseLock.java#L155">scheduleExpirationRenewal</a>方法中：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title function_">scheduleExpirationRenewal</span><span class="params">(<span class="type">long</span> threadId)</span> &#123;</span><br><span class="line">    <span class="type">ExpirationEntry</span> <span class="variable">entry</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">ExpirationEntry</span>();</span><br><span class="line">    <span class="type">ExpirationEntry</span> <span class="variable">oldEntry</span> <span class="operator">=</span> EXPIRATION_RENEWAL_MAP.putIfAbsent(getEntryName(), entry);</span><br><span class="line">    <span class="keyword">if</span> (oldEntry != <span class="literal">null</span>) &#123;</span><br><span class="line">        oldEntry.addThreadId(threadId);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        entry.addThreadId(threadId);</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            renewExpiration();</span><br><span class="line">        &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">            <span class="keyword">if</span> (Thread.currentThread().isInterrupted()) &#123;</span><br><span class="line">                cancelExpirationRenewal(threadId);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//定时任务执行续期</span></span><br><span class="line"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title function_">renewExpiration</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="type">ExpirationEntry</span> <span class="variable">ee</span> <span class="operator">=</span> EXPIRATION_RENEWAL_MAP.get(getEntryName());</span><br><span class="line">    <span class="keyword">if</span> (ee == <span class="literal">null</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="type">Timeout</span> <span class="variable">task</span> <span class="operator">=</span> getServiceManager().newTimeout(<span class="keyword">new</span> <span class="title class_">TimerTask</span>() &#123;</span><br><span class="line">        <span class="meta">@Override</span></span><br><span class="line">        <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">run</span><span class="params">(Timeout timeout)</span> <span class="keyword">throws</span> Exception &#123;</span><br><span class="line">            <span class="type">ExpirationEntry</span> <span class="variable">ent</span> <span class="operator">=</span> EXPIRATION_RENEWAL_MAP.get(getEntryName());</span><br><span class="line">            <span class="keyword">if</span> (ent == <span class="literal">null</span>) &#123;</span><br><span class="line">                <span class="keyword">return</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="type">Long</span> <span class="variable">threadId</span> <span class="operator">=</span> ent.getFirstThreadId();</span><br><span class="line">            <span class="keyword">if</span> (threadId == <span class="literal">null</span>) &#123;</span><br><span class="line">                <span class="keyword">return</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            </span><br><span class="line">            CompletionStage&lt;Boolean&gt; future = renewExpirationAsync(threadId);</span><br><span class="line">            future.whenComplete((res, e) -&gt; &#123;</span><br><span class="line">                <span class="keyword">if</span> (e != <span class="literal">null</span>) &#123;</span><br><span class="line">                    log.error(<span class="string">&quot;Can&#x27;t update lock &#123;&#125; expiration&quot;</span>, getRawName(), e);</span><br><span class="line">                    EXPIRATION_RENEWAL_MAP.remove(getEntryName());</span><br><span class="line">                    <span class="keyword">return</span>;</span><br><span class="line">                &#125;</span><br><span class="line">                </span><br><span class="line">                <span class="keyword">if</span> (res) &#123;</span><br><span class="line">                    <span class="comment">// reschedule itself</span></span><br><span class="line">                    renewExpiration();</span><br><span class="line">                &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                    cancelExpirationRenewal(<span class="literal">null</span>);</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;, internalLockLeaseTime / <span class="number">3</span>, TimeUnit.MILLISECONDS);</span><br><span class="line">    </span><br><span class="line">    ee.setTimeout(task);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="comment">//使用LUA脚本，进行续期</span></span><br><span class="line"><span class="keyword">protected</span> CompletionStage&lt;Boolean&gt; <span class="title function_">renewExpirationAsync</span><span class="params">(<span class="type">long</span> threadId)</span> &#123;</span><br><span class="line">    <span class="keyword">return</span> evalWriteAsync(getRawName(), LongCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,</span><br><span class="line">            <span class="string">&quot;if (redis.call(&#x27;hexists&#x27;, KEYS[1], ARGV[2]) == 1) then &quot;</span> +</span><br><span class="line">                    <span class="string">&quot;redis.call(&#x27;pexpire&#x27;, KEYS[1], ARGV[1]); &quot;</span> +</span><br><span class="line">                    <span class="string">&quot;return 1; &quot;</span> +</span><br><span class="line">                    <span class="string">&quot;end; &quot;</span> +</span><br><span class="line">                    <span class="string">&quot;return 0;&quot;</span>,</span><br><span class="line">            Collections.singletonList(getRawName()),</span><br><span class="line">            internalLockLeaseTime, getLockName(threadId));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<p>可以看到，上面的代码的主要逻辑就是用了一个TimerTask来实现了一个定时任务，设置了internalLockLeaseTime &#x2F; 3的时长进行一次锁续期。默认的超时时长是30s，那么他会每10s进行一次续期，通过LUA脚本进行续期，再续30s</p>
+<p>不过，这个续期也不是无脑续，他也是有条件的，其中ExpirationEntry ent &#x3D; EXPIRATION_RENEWAL_MAP.get(getEntryName());这个值得我们关注，他会从EXPIRATION_RENEWAL_MAP中尝试获取一个KV对，如果查不到，就不续期了。</p>
+<p>EXPIRATION_RENEWAL_MAP这个东西，会在unlock的时候操作的，对他进行remove，所以一个锁如果被解了，那么就不会再继续续期了：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">unlock</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        get(unlockAsync(Thread.currentThread().getId()));</span><br><span class="line">    &#125; <span class="keyword">catch</span> (RedisException e) &#123;</span><br><span class="line">        <span class="keyword">if</span> (e.getCause() <span class="keyword">instanceof</span> IllegalMonitorStateException) &#123;</span><br><span class="line">            <span class="keyword">throw</span> (IllegalMonitorStateException) e.getCause();</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="keyword">throw</span> e;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="keyword">public</span> RFuture&lt;Void&gt; <span class="title function_">unlockAsync</span><span class="params">(<span class="type">long</span> threadId)</span> &#123;</span><br><span class="line">    <span class="keyword">return</span> getServiceManager().execute(() -&gt; unlockAsync0(threadId));</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span> RFuture&lt;Void&gt; <span class="title function_">unlockAsync0</span><span class="params">(<span class="type">long</span> threadId)</span> &#123;</span><br><span class="line">    CompletionStage&lt;Boolean&gt; future = unlockInnerAsync(threadId);</span><br><span class="line">    CompletionStage&lt;Void&gt; f = future.handle((opStatus, e) -&gt; &#123;</span><br><span class="line">        cancelExpirationRenewal(threadId);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (e != <span class="literal">null</span>) &#123;</span><br><span class="line">            <span class="keyword">if</span> (e <span class="keyword">instanceof</span> CompletionException) &#123;</span><br><span class="line">                <span class="keyword">throw</span> (CompletionException) e;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">CompletionException</span>(e);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (opStatus == <span class="literal">null</span>) &#123;</span><br><span class="line">            <span class="type">IllegalMonitorStateException</span> <span class="variable">cause</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">IllegalMonitorStateException</span>(<span class="string">&quot;attempt to unlock lock, not locked by current thread by node id: &quot;</span></span><br><span class="line">                    + id + <span class="string">&quot; thread-id: &quot;</span> + threadId);</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">CompletionException</span>(cause);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">    &#125;);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> <span class="title class_">CompletableFutureWrapper</span>&lt;&gt;(f);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title function_">cancelExpirationRenewal</span><span class="params">(Long threadId)</span> &#123;</span><br><span class="line">    <span class="type">ExpirationEntry</span> <span class="variable">task</span> <span class="operator">=</span> EXPIRATION_RENEWAL_MAP.get(getEntryName());</span><br><span class="line">    <span class="keyword">if</span> (task == <span class="literal">null</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> (threadId != <span class="literal">null</span>) &#123;</span><br><span class="line">        task.removeThreadId(threadId);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (threadId == <span class="literal">null</span> || task.hasNoThreads()) &#123;</span><br><span class="line">        <span class="type">Timeout</span> <span class="variable">timeout</span> <span class="operator">=</span> task.getTimeout();</span><br><span class="line">        <span class="keyword">if</span> (timeout != <span class="literal">null</span>) &#123;</span><br><span class="line">            timeout.cancel();</span><br><span class="line">        &#125;</span><br><span class="line">        EXPIRATION_RENEWAL_MAP.remove(getEntryName());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<p>以上代码，第4行-&gt;16行-&gt;22行-&gt;57行。就是一次unlock过程中，对EXPIRATION_RENEWAL_MAP进行移除，进而取消下一次锁续期的实现细节。</p>
+<p>并且在unlockAsync方法中，不管unlockInnerAsync是否执行成功，还是抛了异常，都不影响cancelExpirationRenewal的执行，也可以理解为，只要unlock方法被调用了，即使解锁未成功，那么也可以停止下一次的锁续期。</p>
+<p><strong>什么情况会进行续期</strong></p>
+<p>当我们使用Redisson创建一个分布式锁的时候，并不是所有情况都会续期的，我们可以看下以下加锁过程的代码实现：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> RFuture&lt;Long&gt; <span class="title function_">tryAcquireAsync</span><span class="params">(<span class="type">long</span> waitTime, <span class="type">long</span> leaseTime, TimeUnit unit, <span class="type">long</span> threadId)</span> &#123;</span><br><span class="line">    RFuture&lt;Long&gt; ttlRemainingFuture;</span><br><span class="line">    <span class="keyword">if</span> (leaseTime &gt; <span class="number">0</span>) &#123;</span><br><span class="line">        ttlRemainingFuture = tryLockInnerAsync(waitTime, leaseTime, unit, threadId, RedisCommands.EVAL_LONG);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        ttlRemainingFuture = tryLockInnerAsync(waitTime, internalLockLeaseTime,</span><br><span class="line">                TimeUnit.MILLISECONDS, threadId, RedisCommands.EVAL_LONG);</span><br><span class="line">    &#125;</span><br><span class="line">    CompletionStage&lt;Long&gt; s = handleNoSync(threadId, ttlRemainingFuture);</span><br><span class="line">    ttlRemainingFuture = <span class="keyword">new</span> <span class="title class_">CompletableFutureWrapper</span>&lt;&gt;(s);</span><br><span class="line"></span><br><span class="line">    CompletionStage&lt;Long&gt; f = ttlRemainingFuture.thenApply(ttlRemaining -&gt; &#123;</span><br><span class="line">        <span class="comment">// lock acquired</span></span><br><span class="line">        <span class="keyword">if</span> (ttlRemaining == <span class="literal">null</span>) &#123;</span><br><span class="line">            <span class="keyword">if</span> (leaseTime &gt; <span class="number">0</span>) &#123;</span><br><span class="line">                internalLockLeaseTime = unit.toMillis(leaseTime);</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                scheduleExpirationRenewal(threadId);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> ttlRemaining;</span><br><span class="line">    &#125;);</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> <span class="title class_">CompletableFutureWrapper</span>&lt;&gt;(f);</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p><strong>什么情况会停止续期</strong></p>
+<p>如果一个锁的unlock方法被调用了，那么就会停止续期。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title function_">cancelExpirationRenewal</span><span class="params">(Long threadId)</span> &#123;</span><br><span class="line">    <span class="type">ExpirationEntry</span> <span class="variable">task</span> <span class="operator">=</span> EXPIRATION_RENEWAL_MAP.get(getEntryName());</span><br><span class="line">    <span class="keyword">if</span> (task == <span class="literal">null</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> (threadId != <span class="literal">null</span>) &#123;</span><br><span class="line">        task.removeThreadId(threadId);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (threadId == <span class="literal">null</span> || task.hasNoThreads()) &#123;</span><br><span class="line">        <span class="type">Timeout</span> <span class="variable">timeout</span> <span class="operator">=</span> task.getTimeout();</span><br><span class="line">        <span class="keyword">if</span> (timeout != <span class="literal">null</span>) &#123;</span><br><span class="line">            timeout.cancel();</span><br><span class="line">        &#125;</span><br><span class="line">        EXPIRATION_RENEWAL_MAP.remove(getEntryName());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<p>主要就是通过EXPIRATION_RENEWAL_MAP.remove来做的。那么cancelExpirationRenewal还有下面一处调用：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title function_">scheduleExpirationRenewal</span><span class="params">(<span class="type">long</span> threadId)</span> &#123;</span><br><span class="line">    <span class="type">ExpirationEntry</span> <span class="variable">entry</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">ExpirationEntry</span>();</span><br><span class="line">    <span class="type">ExpirationEntry</span> <span class="variable">oldEntry</span> <span class="operator">=</span> EXPIRATION_RENEWAL_MAP.putIfAbsent(getEntryName(), entry);</span><br><span class="line">    <span class="keyword">if</span> (oldEntry != <span class="literal">null</span>) &#123;</span><br><span class="line">        oldEntry.addThreadId(threadId);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        entry.addThreadId(threadId);</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            renewExpiration();</span><br><span class="line">        &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">            <span class="keyword">if</span> (Thread.currentThread().isInterrupted()) &#123;</span><br><span class="line">                cancelExpirationRenewal(threadId);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>也就是说，在尝试开启续期的过程中，如果线程被中断了，那么就会取消续期动作了。</p>
+<p>目前，Redisson是没有针对最大续期次数和最大续期时间的支持的。所以，正常情况下，如果没有解锁，是会一直续期下去的。</p>
+<p>但是需要注意的是，Redisson的续期是Netty的时间轮（TimerTask、Timeout、Timer）的，并且操作都是基于JVM的，所以，当应用宕机、下线或者重启后，续期任务就没有了。这样也能在一定程度上避免机器挂了但是锁一直不释放导致的死锁问题。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2023/11/02/%E5%A6%82%E4%BD%95%E5%9F%BA%E4%BA%8ERedis%E5%AE%9E%E7%8E%B0%E6%BB%91%E5%8A%A8%E7%AA%97%E5%8F%A3%E9%99%90%E6%B5%81/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -442,6 +545,92 @@
 
 
 <h4 id="得到结果"><a href="#得到结果" class="headerlink" title="得到结果"></a>得到结果</h4><p>在用了CompletableFuture做编排之前，原来50笔订单的暂停扣款，需要大概10s左右，但是用了CompletableFuture之后，50笔订单的暂停扣款只需要1秒钟左右。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2023/07/10/%E9%94%81%E5%92%8C%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81%E7%9A%84%E6%A0%B8%E5%BF%83%E5%8C%BA%E5%88%AB%E6%98%AF%E4%BB%80%E4%B9%88/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/touxiang.jpg">
+      <meta itemprop="name" content="bad godd">
+      <meta itemprop="description" content="无问东西">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Bad Godd's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2023/07/10/%E9%94%81%E5%92%8C%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81%E7%9A%84%E6%A0%B8%E5%BF%83%E5%8C%BA%E5%88%AB%E6%98%AF%E4%BB%80%E4%B9%88/" class="post-title-link" itemprop="url">锁和分布式锁的核心区别是什么</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2023-07-10 23:16:46" itemprop="dateCreated datePublished" datetime="2023-07-10T23:16:46+08:00">2023-07-10</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%88%86%E5%B8%83%E5%BC%8F/" itemprop="url" rel="index"><span itemprop="name">分布式</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>406</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>1 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>锁和分布式锁的核心区别主要在于作用范围和适用场景。</p>
+<p>锁，我们常用的就是synchronized，ReentrantLock等，他们通常是在单个进程内起作用的同步机制，用于控制对共享资源的访问。多个线程或进程之间可以使用锁来确保对关键资源的互斥访问。</p>
+<p>这种锁，主要适用于单体应用，确保在同一JVM进程内多个线程同步共享资源的访问。</p>
+<p>分布式锁，作用范围更广泛，可以跨越多个计算机或多个进程，用于协调分布式系统中的不同节点，以确保在全局范围内对共享资源的互斥访问。</p>
+<p>分布式锁适用于分布式系统中，各个节点之间需要协调共享资源访问的情况。在分布式环境中，传统的锁机制可能无法有效地处理多节点之间的同步问题，因此需要分布式锁来确保一致性。</p>
+<p>所以，普通的锁主要用于单机环境，用于控制同一JVM进程中多个线程对共享资源的互斥访问。而分布式锁则适用于分布式环境，用于协调多个计算机或多个进程之间对共享资源的互斥访问，确保分布式系统的一致性。</p>
 
       
     </div>
@@ -959,255 +1148,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/touxiang.jpg">
-      <meta itemprop="name" content="bad godd">
-      <meta itemprop="description" content="无问东西">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Bad Godd's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/" class="post-title-link" itemprop="url">双亲委派企业级应用</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-01-10 21:29:44" itemprop="dateCreated datePublished" datetime="2022-01-10T21:29:44+08:00">2022-01-10</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/JVM/" itemprop="url" rel="index"><span itemprop="name">JVM</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>1.7k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>2 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h1 id="JDBC-SPI"><a href="#JDBC-SPI" class="headerlink" title="JDBC-SPI"></a>JDBC-SPI</h1><h2 id="打破背景"><a href="#打破背景" class="headerlink" title="打破背景"></a>打破背景</h2><p>为了更加灵活的连接数据库，我们的JDK定义了<code>Driver</code>接口，需要与数据库进行连接的包必须实现该接口。例如：MySQL，建议去观察下项目中<code>mysql-connector</code>包，下面就有实现类的全限定类名。  </p>
-<p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011142644308-1697011108741.png" alt="image-20231011142644308"></p>
-<h2 id="打破原因"><a href="#打破原因" class="headerlink" title="打破原因"></a>打破原因</h2><p>在上述背景下，执行 <code>DriverManager</code>类的方法时，需要去加载实现类。还记得我们第一篇文章讲的 <code>BootStrapClassLoader</code>吗，它只能加载<code>rt.jar</code>下的类。而MySQL的加载路径隶属于<code>AppClassLoader</code>,所以理论上它压根就不能被加载。</p>
-<p>于是线程上下文类加载器就应运而生，由于<code>ThreadClassLoader</code>一般情况下&#x3D;&#x3D;<code>AppClassLoader</code>。于是通过线程上下文类加载器加载JDBC实现类，打破了双亲委派模型，顺利实现功能。</p>
-<h2 id="源码解读"><a href="#源码解读" class="headerlink" title="源码解读"></a>源码解读</h2><ol>
-<li><p>查看DriverManager类 </p>
-<p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011142230230-1697011108742.png" alt="image-20231011142230230"></p>
-</li>
-<li><p>获取线程上下文加载器，一般是AppClassLoder，并且Set到ServiceLoader中 </p>
-</li>
-<li><p>通过迭代器迭代<img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011142323580-1697011108742.png" alt="image-20231011142323580"></p>
-</li>
-<li><p>获取实现类路径配置 &#x3D; “META-INF&#x2F;services&#x2F;“ + service.name; </p>
-<p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011142340932-1697011108742.png" alt="image-20231011142340932"></p>
-</li>
-<li><p>加载实现类 </p>
-<p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011142704289-1697011108742.png" alt="image-20231011142704289"></p>
-</li>
-</ol>
-<h2 id="不足"><a href="#不足" class="headerlink" title="不足"></a>不足</h2><p>ServiceLoader只提供了遍历的方式来获取目标实现类，假如有多个JDBC实现类，都会去加载，没有提供按需加载的方法。像<code>Dubbo SPI</code>就提供了可配置化的加载.</p>
-<h1 id="Tomcat"><a href="#Tomcat" class="headerlink" title="Tomcat"></a>Tomcat</h1><h2 id="打破背景-1"><a href="#打破背景-1" class="headerlink" title="打破背景"></a>打破背景</h2><p>Tomcat能将多个WebApp应用在一个容器内启动。</p>
-<h2 id="打破原因-1"><a href="#打破原因-1" class="headerlink" title="打破原因"></a>打破原因</h2><ol>
-<li>Tomcat下有多个WebApp,但它只有一个JVM。不同的WebApp可能会依赖同一个第三方类库的不同版本，因此要保证每个应用程序的类库都是独立的，保证相互隔离。</li>
-<li>部署在同一个Tomcat容器中相同的类库相同的版本可以共享。否则，如果服务器有10个应用程序，那么要有10份相同的类库加载进虚拟机。</li>
-<li>web容器也有自己依赖的类库，不能于应用程序的类库混淆。基于安全考虑，应该让容器的类库和程序的类库隔离开来。 总结：有些共用类只需要一份，有些类只需要多份隔离。</li>
-</ol>
-<h2 id="实现方式"><a href="#实现方式" class="headerlink" title="实现方式"></a>实现方式</h2><p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231010110449075-1697009246437-1697011108742.png" alt="image-20231010110449075"></p>
-<ol>
-<li>Webapp 应用类加载器每个应用在部署后，都会创建一个唯一的类加载器。该类加载器会加载位于 WEB-INF&#x2F;lib下的jar文件中的class 和 WEB-INF&#x2F;classes下的class文件。</li>
-<li>通过<code>Common ClassLoader</code>加载通用的类。</li>
-<li>通过 <code>Catalina ClassLoader</code> 加载Tomcat自身需要的类。</li>
-</ol>
-<h1 id="SpringBoot"><a href="#SpringBoot" class="headerlink" title="SpringBoot"></a>SpringBoot</h1><h2 id="打破背景-2"><a href="#打破背景-2" class="headerlink" title="打破背景"></a>打破背景</h2><p><code>SpringBoot</code>为了jar包结构的简洁,创建了与普通jar包不一样的包格式</p>
-<h2 id="打破原因-2"><a href="#打破原因-2" class="headerlink" title="打破原因"></a>打破原因</h2><p>jar文件规范中，一个jar文件如果要运行必须将入口类放置到jar文件的顶层目录，这样才能被正确的加载。</p>
-<h2 id="查看源码方法"><a href="#查看源码方法" class="headerlink" title="查看源码方法"></a>查看源码方法</h2><p>单纯的SpringBoot项目你找不到启动类的，看这个链接:<a href="https://link.juejin.cn/?target=https://www.cnblogs.com/fengpinglangjingruma/p/13916297.html">点它 </a>。</p>
-<h2 id="实现方式-1"><a href="#实现方式-1" class="headerlink" title="实现方式"></a>实现方式</h2><ol>
-<li><p>当<code>java -jar xxx</code>时，会去调用<code>JarLauncher.launch()</code>方法。</p>
-</li>
-<li><p>获取需要加载的类和包并作为参数传递到LauncherURLClassLoader </p>
-</li>
-<li><p>创建类加载器 </p>
-</li>
-<li><p>获取启动类, 可以看到在我们的项目中Start-Class &#x3D; “Application.class” </p>
-<p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011153254352-1697011108742.png" alt="image-20231011153254352"> </p>
-</li>
-<li><p>通过自定义加载器加载类，并且反射调用 <code>Start-Class</code>的<code>main</code>方法启动项目。 </p>
-<p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011153237491-1697011108742.png" alt="image-20231011153237491"></p>
-</li>
-</ol>
-<h1 id="热加载"><a href="#热加载" class="headerlink" title="热加载"></a>热加载</h1><h2 id="打破背景-3"><a href="#打破背景-3" class="headerlink" title="打破背景"></a>打破背景</h2><p>早期的项目，如果修改了代码之后，需要重启项目才能使代码正确运行。</p>
-<h2 id="打破原因-3"><a href="#打破原因-3" class="headerlink" title="打破原因"></a>打破原因</h2><p>为了让代码修改后能够快速响应，需要通过热加载的形式，动态发现修改的类，并且使用自定义类加载器快速加载变化的类。</p>
-<h2 id="实现方式-2"><a href="#实现方式-2" class="headerlink" title="实现方式"></a>实现方式</h2><p><img src="/2022/01/10/%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B/image-20231011162414744.png" alt="image-20231011162414744"></p>
-<h1 id="Jar包冲突"><a href="#Jar包冲突" class="headerlink" title="Jar包冲突"></a>Jar包冲突</h1><h2 id="打破背景-4"><a href="#打破背景-4" class="headerlink" title="打破背景"></a>打破背景</h2><p>项目中经常出现jar包冲突导致抛出异常，不是NoSuchMethod,NoClassDefund。</p>
-<h2 id="打破原因-4"><a href="#打破原因-4" class="headerlink" title="打破原因"></a>打破原因</h2><p>Jar包冲突的原因是使用了C2类的方法, 但JVM却加载了C1类。可以让相同包名的包由不同的类加载器加载，进行隔离，避免jar包冲突。</p>
-<h2 id="实现方式-3"><a href="#实现方式-3" class="headerlink" title="实现方式"></a>实现方式</h2><ol>
-<li><p>通过自定义类加载器，为每个中间件自定义一个加载器，这些加载器之间的关系是平行的，彼此没有依赖关系。</p>
-</li>
-<li><p>这样每个中间件的classloader就可以加载各自版本的包。因为一个类的全限定名以及加载该类的加载器两者共同形成了这个类在JVM中的惟一标识。</p>
-</li>
-</ol>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2022/01/03/git%E4%BD%BF%E7%94%A8%E4%B8%AD-error-pathspec-%E2%80%98xxx%E2%80%98-did-not-match-any-file-s-known-to-git-%E6%8A%A5%E9%94%99%E8%A7%A3%E5%86%B3%E6%96%B9%E6%B3%95/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/touxiang.jpg">
-      <meta itemprop="name" content="bad godd">
-      <meta itemprop="description" content="无问东西">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Bad Godd's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/01/03/git%E4%BD%BF%E7%94%A8%E4%B8%AD-error-pathspec-%E2%80%98xxx%E2%80%98-did-not-match-any-file-s-known-to-git-%E6%8A%A5%E9%94%99%E8%A7%A3%E5%86%B3%E6%96%B9%E6%B3%95/" class="post-title-link" itemprop="url">git使用中 error: pathspec ‘xxx‘ did not match any file(s) known to git 报错解决方法</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-01-03 20:11:04" itemprop="dateCreated datePublished" datetime="2022-01-03T20:11:04+08:00">2022-01-03</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Git/" itemprop="url" rel="index"><span itemprop="name">Git</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>1.2k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="一、问题描述"><a href="#一、问题描述" class="headerlink" title="一、问题描述"></a>一、问题描述</h2><p>项目上想合并代码，以自己的分支master作为主分支，要合并分支study，结果<br>在 git merge study 的时候报如下错误<br>其实在 git checkout 的时候也会出现这个错误</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">error: pathspec &#x27;origin/XXX&#x27; did not match any file(s) known to git.</span><br><span class="line">发现是本地git没有识别到远程git仓库的分支</span><br></pre></td></tr></table></figure>
-
-<h2 id="二、解决办法"><a href="#二、解决办法" class="headerlink" title="二、解决办法"></a>二、解决办法</h2><p>1、首先看下所有分支 是否有新分支</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git branch -a</span><br></pre></td></tr></table></figure>
-
-<p>2、如果没看到，那么执行以下操作，这步是获取所有分支</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git fetch</span><br></pre></td></tr></table></figure>
-
-
-<p>执行完会看到这样提示</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">remote: Enumerating objects: 4, done.</span><br><span class="line">remote: Counting objects: 100% (4/4), done.</span><br><span class="line">Unpacking objects: 100% (4/4), 1.06 KiB | 90.00 KiB/s, done.</span><br><span class="line">From codeup.aliyun.com:5eeb0689892c58bb7c394ab5/pxb/pxb-fronted</span><br><span class="line"> * [new branch]      XXX -&gt; origin/XXX</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-
-
-<p>3、切换到远程分支:</p>
-<p>git checkout origin&#x2F;xxx</p>
-<p>提示：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">Note: switching to &#x27;origin/xxx&#x27;.</span><br><span class="line"></span><br><span class="line">You are in &#x27;detached HEAD&#x27; state. You can look around, make experimental</span><br><span class="line">changes and commit them, and you can discard any commits you make in this</span><br><span class="line">state without impacting any branches by switching back to a branch.</span><br><span class="line"></span><br><span class="line">If you want to create a new branch to retain commits you create, you may</span><br><span class="line">do so (now or later) by using -c with the switch command. Example:</span><br><span class="line"></span><br><span class="line">  git switch -c &lt;new-branch-name&gt;</span><br><span class="line"></span><br><span class="line">Or undo this operation with:</span><br><span class="line"></span><br><span class="line">  git switch -</span><br><span class="line"></span><br><span class="line">Turn off this advice by setting config variable advice.detachedHead to false</span><br><span class="line"></span><br><span class="line">HEAD is now at dc877cd XXX</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-<p>4、现在可以看到自己的分支是一串数字字母，这时新建并切换到分支</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git checkout -b xxx</span><br></pre></td></tr></table></figure>
-
-<p>5、现在需要跟远程的分支进行关联</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git branch -u origin/xxx</span><br></pre></td></tr></table></figure>
-
-<p>6、这时我们执行git pull来看看什么反馈:</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Already up-to-date.</span><br></pre></td></tr></table></figure>
-
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1279,7 +1219,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">21</span>
+          <span class="site-state-item-count">23</span>
           <span class="site-state-item-name">博客</span>
         </a>
       </div>

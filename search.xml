@@ -82,6 +82,30 @@
       </tags>
   </entry>
   <entry>
+    <title>TCC的空回滚和悬挂是什么？如何解决</title>
+    <url>/2024/04/28/TCC%E7%9A%84%E7%A9%BA%E5%9B%9E%E6%BB%9A%E5%92%8C%E6%82%AC%E6%8C%82%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%9F%E5%A6%82%E4%BD%95%E8%A7%A3%E5%86%B3/</url>
+    <content><![CDATA[<p>在TCC中，存在着两个比较关键的问题，那就是空回滚和悬挂的问题。</p>
+<p>1 <strong>空回滚问题</strong>：TCC中的Try过程中，有的参与者成功了，有的参与者失败了，这时候就需要所有参与者都执行Cancel，这时候，对于那些没有Try成功的参与者来说，本次回滚就是一次空回滚。需要在业务中做好对空回滚的识别和处理，否则就会出现异常报错的情况，甚至可能导致Cancel一直失败，最终导致整个分布式事务失败。</p>
+<p>2 <strong>悬挂事务问题</strong>：TCC的实现方式存在悬挂事务的问题，在调用TCC服务的一阶段Try操作时，可能会出现因网络拥堵而导致的超时，此时事务协调器会触发二阶段回滚，调用TCC服务的Cancel操作；在此之后，拥堵在网络上的一阶段Try数据包被TCC服务收到，出现了二阶段Cancel请求比一阶段Try请求先执行的情况。举一个比较常见的具体场景：一次分布式事务，先发生了Try，但是因为有的节点失败，又发生了Cancel，而下游的某个节点因为网络延迟导致先接到了Cancel，在空回滚完成后，又接到了Try的请求，然后执行了，这就会导致这个节点的Try占用的资源无法释放，也没人会再来处理了，就会导致了事务悬挂。</p>
+<p>这两个问题处理不好，都可能会导致一个分布式事务没办法保证最终一致性。有一个办法，可以一次性的解决以上两个问题，那就是——引入分布式事务记录表。</p>
+<p>有了这张表，每一个参与者，都可以在本地事务执行的过程中，同时记录一次分布式事务的操作记录。</p>
+<p>这张表中有两个关键的字段，一个是tx_id用于保存本次处理的事务ID，还有一个就是state，用于记录本次事务的执行状态。至于其他的字段，比如一些业务数据，执行时间、业务场景啥的，就自己想记录上就记录啥。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">CREATE TABLE `distribute_transaction` (</span><br><span class="line">  `tx_id` varchar(128) NOT NULL COMMENT &#x27;事务id&#x27;,</span><br><span class="line">  `state` int(1) DEFAULT NULL COMMENT &#x27;事务状态，0:try，1:confirm，2:cancel&#x27;,</span><br><span class="line">  PRIMARY KEY (`tx_id`) U</span><br><span class="line">) </span><br></pre></td></tr></table></figure>
+
+
+
+<p>有了这张表以后，我们在做try、cancel和confirm操作之后，都需要在本地事务中创建或者修改这条记录。一条记录的状态机如下：</p>
+<p><img src="/2024/04/28/TCC%E7%9A%84%E7%A9%BA%E5%9B%9E%E6%BB%9A%E5%92%8C%E6%82%AC%E6%8C%82%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%9F%E5%A6%82%E4%BD%95%E8%A7%A3%E5%86%B3/image-20241128171501810.png" alt="image-20241128171501810"></p>
+<p><strong>空回滚解决</strong>：当一个参与者接到一次Cancel请求的时候，先去distribute_transaction表中根据tx_id查询是否有try的记录，如果没有，则进行一次空回滚即可。并在distribute_transaction中创建一条记录，状态标记为cancel。</p>
+<p><strong>事务悬挂解决</strong>：当一个参与者接到一次Try请求的时候，先去distribute_transaction表中根据tx_id查询是否有记录，如果当前存在，并且记录的状态是cancel，则拒绝本次try请求。</p>
+<p>但是需要注意的是，上面的请求过程，需要做好并发控制。</p>
+<p>有了这张表，我们还可以基于他做幂等控制，每次try-cancel-confirm请求来的时候，都可以到这张表中查一下，然后做幂等控制。</p>
+]]></content>
+      <categories>
+        <category>分布式</category>
+      </categories>
+  </entry>
+  <entry>
     <title>ThreadLocal内存泄露问题</title>
     <url>/2023/05/13/ThreadLocal%E5%86%85%E5%AD%98%E6%B3%84%E9%9C%B2%E9%97%AE%E9%A2%98/</url>
     <content><![CDATA[<p>ThreadLocal是java.lang下面的一个类，是用来解决java多线程程序中并发问题的一种途径；通过为每一个线程创建一份共享变量的副本来保证各个线程之间的变量的访问和修改互相不影响；</p>
@@ -642,6 +666,20 @@
 ]]></content>
       <categories>
         <category>高性能</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>锁和分布式锁的核心区别是什么</title>
+    <url>/2023/07/10/%E9%94%81%E5%92%8C%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81%E7%9A%84%E6%A0%B8%E5%BF%83%E5%8C%BA%E5%88%AB%E6%98%AF%E4%BB%80%E4%B9%88/</url>
+    <content><![CDATA[<p>锁和分布式锁的核心区别主要在于作用范围和适用场景。</p>
+<p>锁，我们常用的就是synchronized，ReentrantLock等，他们通常是在单个进程内起作用的同步机制，用于控制对共享资源的访问。多个线程或进程之间可以使用锁来确保对关键资源的互斥访问。</p>
+<p>这种锁，主要适用于单体应用，确保在同一JVM进程内多个线程同步共享资源的访问。</p>
+<p>分布式锁，作用范围更广泛，可以跨越多个计算机或多个进程，用于协调分布式系统中的不同节点，以确保在全局范围内对共享资源的互斥访问。</p>
+<p>分布式锁适用于分布式系统中，各个节点之间需要协调共享资源访问的情况。在分布式环境中，传统的锁机制可能无法有效地处理多节点之间的同步问题，因此需要分布式锁来确保一致性。</p>
+<p>所以，普通的锁主要用于单机环境，用于控制同一JVM进程中多个线程对共享资源的互斥访问。而分布式锁则适用于分布式环境，用于协调多个计算机或多个进程之间对共享资源的互斥访问，确保分布式系统的一致性。</p>
+]]></content>
+      <categories>
+        <category>分布式</category>
       </categories>
   </entry>
 </search>

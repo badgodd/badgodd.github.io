@@ -760,6 +760,102 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2024/04/28/TCC%E7%9A%84%E7%A9%BA%E5%9B%9E%E6%BB%9A%E5%92%8C%E6%82%AC%E6%8C%82%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%9F%E5%A6%82%E4%BD%95%E8%A7%A3%E5%86%B3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/touxiang.jpg">
+      <meta itemprop="name" content="bad godd">
+      <meta itemprop="description" content="无问东西">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Bad Godd's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2024/04/28/TCC%E7%9A%84%E7%A9%BA%E5%9B%9E%E6%BB%9A%E5%92%8C%E6%82%AC%E6%8C%82%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%9F%E5%A6%82%E4%BD%95%E8%A7%A3%E5%86%B3/" class="post-title-link" itemprop="url">TCC的空回滚和悬挂是什么？如何解决</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2024-04-28 22:12:54" itemprop="dateCreated datePublished" datetime="2024-04-28T22:12:54+08:00">2024-04-28</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%88%86%E5%B8%83%E5%BC%8F/" itemprop="url" rel="index"><span itemprop="name">分布式</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>1.3k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>1 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>在TCC中，存在着两个比较关键的问题，那就是空回滚和悬挂的问题。</p>
+<p>1 <strong>空回滚问题</strong>：TCC中的Try过程中，有的参与者成功了，有的参与者失败了，这时候就需要所有参与者都执行Cancel，这时候，对于那些没有Try成功的参与者来说，本次回滚就是一次空回滚。需要在业务中做好对空回滚的识别和处理，否则就会出现异常报错的情况，甚至可能导致Cancel一直失败，最终导致整个分布式事务失败。</p>
+<p>2 <strong>悬挂事务问题</strong>：TCC的实现方式存在悬挂事务的问题，在调用TCC服务的一阶段Try操作时，可能会出现因网络拥堵而导致的超时，此时事务协调器会触发二阶段回滚，调用TCC服务的Cancel操作；在此之后，拥堵在网络上的一阶段Try数据包被TCC服务收到，出现了二阶段Cancel请求比一阶段Try请求先执行的情况。举一个比较常见的具体场景：一次分布式事务，先发生了Try，但是因为有的节点失败，又发生了Cancel，而下游的某个节点因为网络延迟导致先接到了Cancel，在空回滚完成后，又接到了Try的请求，然后执行了，这就会导致这个节点的Try占用的资源无法释放，也没人会再来处理了，就会导致了事务悬挂。</p>
+<p>这两个问题处理不好，都可能会导致一个分布式事务没办法保证最终一致性。有一个办法，可以一次性的解决以上两个问题，那就是——引入分布式事务记录表。</p>
+<p>有了这张表，每一个参与者，都可以在本地事务执行的过程中，同时记录一次分布式事务的操作记录。</p>
+<p>这张表中有两个关键的字段，一个是tx_id用于保存本次处理的事务ID，还有一个就是state，用于记录本次事务的执行状态。至于其他的字段，比如一些业务数据，执行时间、业务场景啥的，就自己想记录上就记录啥。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">CREATE TABLE `distribute_transaction` (</span><br><span class="line">  `tx_id` varchar(128) NOT NULL COMMENT &#x27;事务id&#x27;,</span><br><span class="line">  `state` int(1) DEFAULT NULL COMMENT &#x27;事务状态，0:try，1:confirm，2:cancel&#x27;,</span><br><span class="line">  PRIMARY KEY (`tx_id`) U</span><br><span class="line">) </span><br></pre></td></tr></table></figure>
+
+
+
+<p>有了这张表以后，我们在做try、cancel和confirm操作之后，都需要在本地事务中创建或者修改这条记录。一条记录的状态机如下：</p>
+<p><img src="/2024/04/28/TCC%E7%9A%84%E7%A9%BA%E5%9B%9E%E6%BB%9A%E5%92%8C%E6%82%AC%E6%8C%82%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%9F%E5%A6%82%E4%BD%95%E8%A7%A3%E5%86%B3/image-20241128171501810.png" alt="image-20241128171501810"></p>
+<p><strong>空回滚解决</strong>：当一个参与者接到一次Cancel请求的时候，先去distribute_transaction表中根据tx_id查询是否有try的记录，如果没有，则进行一次空回滚即可。并在distribute_transaction中创建一条记录，状态标记为cancel。</p>
+<p><strong>事务悬挂解决</strong>：当一个参与者接到一次Try请求的时候，先去distribute_transaction表中根据tx_id查询是否有记录，如果当前存在，并且记录的状态是cancel，则拒绝本次try请求。</p>
+<p>但是需要注意的是，上面的请求过程，需要做好并发控制。</p>
+<p>有了这张表，我们还可以基于他做幂等控制，每次try-cancel-confirm请求来的时候，都可以到这张表中查一下，然后做幂等控制。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2024/03/11/%E8%AF%BB%E5%86%99%E5%88%86%E7%A6%BB%E9%81%87%E5%88%B0%E4%B8%BB%E4%BB%8E%E5%BB%B6%E8%BF%9F%E6%80%8E%E4%B9%88%E5%8A%9E/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1084,109 +1180,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://badgodd.github.io/2023/12/17/Redisson%E7%9A%84watchdog%E6%9C%BA%E5%88%B6%E6%98%AF%E6%80%8E%E4%B9%88%E6%A0%B7%E7%9A%84%EF%BC%9F/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/touxiang.jpg">
-      <meta itemprop="name" content="bad godd">
-      <meta itemprop="description" content="无问东西">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Bad Godd's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2023/12/17/Redisson%E7%9A%84watchdog%E6%9C%BA%E5%88%B6%E6%98%AF%E6%80%8E%E4%B9%88%E6%A0%B7%E7%9A%84%EF%BC%9F/" class="post-title-link" itemprop="url">Redisson的watchdog机制是怎么样的？</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2023-12-17 13:34:08" itemprop="dateCreated datePublished" datetime="2023-12-17T13:34:08+08:00">2023-12-17</time>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>6.6k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>6 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>为了避免Redis实现的分布式锁超时，Redisson中引入了watch dog的机制，他可以帮助我们在Redisson实例被关闭前，不断的延长锁的有效期。</p>
-<p>自动续租：当一个Redisson客户端实例获取到一个分布式锁时，如果没有指定锁的超时时间，Watchdog会基于Netty的时间轮启动一个后台任务，定期向Redis发送命令，重新设置锁的过期时间，通常是锁的租约时间的1&#x2F;3。这确保了即使客户端处理时间较长，所持有的锁也不会过期。<br>续期时长：默认情况下，每10s钟做一次续期，续期时长是30s。<br>停止续期：当锁被释放或者客户端实例被关闭时，Watchdog会自动停止对应锁的续租任务。</p>
-<p>在Redisson中，watch dog的主要实现在<a target="_blank" rel="noopener" href="https://github.com/redisson/redisson/blob/master/redisson/src/main/java/org/redisson/RedissonBaseLock.java#L155">scheduleExpirationRenewal</a>方法中：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title function_">scheduleExpirationRenewal</span><span class="params">(<span class="type">long</span> threadId)</span> &#123;</span><br><span class="line">    <span class="type">ExpirationEntry</span> <span class="variable">entry</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">ExpirationEntry</span>();</span><br><span class="line">    <span class="type">ExpirationEntry</span> <span class="variable">oldEntry</span> <span class="operator">=</span> EXPIRATION_RENEWAL_MAP.putIfAbsent(getEntryName(), entry);</span><br><span class="line">    <span class="keyword">if</span> (oldEntry != <span class="literal">null</span>) &#123;</span><br><span class="line">        oldEntry.addThreadId(threadId);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        entry.addThreadId(threadId);</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            renewExpiration();</span><br><span class="line">        &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">            <span class="keyword">if</span> (Thread.currentThread().isInterrupted()) &#123;</span><br><span class="line">                cancelExpirationRenewal(threadId);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//定时任务执行续期</span></span><br><span class="line"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title function_">renewExpiration</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="type">ExpirationEntry</span> <span class="variable">ee</span> <span class="operator">=</span> EXPIRATION_RENEWAL_MAP.get(getEntryName());</span><br><span class="line">    <span class="keyword">if</span> (ee == <span class="literal">null</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="type">Timeout</span> <span class="variable">task</span> <span class="operator">=</span> getServiceManager().newTimeout(<span class="keyword">new</span> <span class="title class_">TimerTask</span>() &#123;</span><br><span class="line">        <span class="meta">@Override</span></span><br><span class="line">        <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">run</span><span class="params">(Timeout timeout)</span> <span class="keyword">throws</span> Exception &#123;</span><br><span class="line">            <span class="type">ExpirationEntry</span> <span class="variable">ent</span> <span class="operator">=</span> EXPIRATION_RENEWAL_MAP.get(getEntryName());</span><br><span class="line">            <span class="keyword">if</span> (ent == <span class="literal">null</span>) &#123;</span><br><span class="line">                <span class="keyword">return</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="type">Long</span> <span class="variable">threadId</span> <span class="operator">=</span> ent.getFirstThreadId();</span><br><span class="line">            <span class="keyword">if</span> (threadId == <span class="literal">null</span>) &#123;</span><br><span class="line">                <span class="keyword">return</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            </span><br><span class="line">            CompletionStage&lt;Boolean&gt; future = renewExpirationAsync(threadId);</span><br><span class="line">            future.whenComplete((res, e) -&gt; &#123;</span><br><span class="line">                <span class="keyword">if</span> (e != <span class="literal">null</span>) &#123;</span><br><span class="line">                    log.error(<span class="string">&quot;Can&#x27;t update lock &#123;&#125; expiration&quot;</span>, getRawName(), e);</span><br><span class="line">                    EXPIRATION_RENEWAL_MAP.remove(getEntryName());</span><br><span class="line">                    <span class="keyword">return</span>;</span><br><span class="line">                &#125;</span><br><span class="line">                </span><br><span class="line">                <span class="keyword">if</span> (res) &#123;</span><br><span class="line">                    <span class="comment">// reschedule itself</span></span><br><span class="line">                    renewExpiration();</span><br><span class="line">                &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                    cancelExpirationRenewal(<span class="literal">null</span>);</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;, internalLockLeaseTime / <span class="number">3</span>, TimeUnit.MILLISECONDS);</span><br><span class="line">    </span><br><span class="line">    ee.setTimeout(task);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="comment">//使用LUA脚本，进行续期</span></span><br><span class="line"><span class="keyword">protected</span> CompletionStage&lt;Boolean&gt; <span class="title function_">renewExpirationAsync</span><span class="params">(<span class="type">long</span> threadId)</span> &#123;</span><br><span class="line">    <span class="keyword">return</span> evalWriteAsync(getRawName(), LongCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,</span><br><span class="line">            <span class="string">&quot;if (redis.call(&#x27;hexists&#x27;, KEYS[1], ARGV[2]) == 1) then &quot;</span> +</span><br><span class="line">                    <span class="string">&quot;redis.call(&#x27;pexpire&#x27;, KEYS[1], ARGV[1]); &quot;</span> +</span><br><span class="line">                    <span class="string">&quot;return 1; &quot;</span> +</span><br><span class="line">                    <span class="string">&quot;end; &quot;</span> +</span><br><span class="line">                    <span class="string">&quot;return 0;&quot;</span>,</span><br><span class="line">            Collections.singletonList(getRawName()),</span><br><span class="line">            internalLockLeaseTime, getLockName(threadId));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-
-
-<p>可以看到，上面的代码的主要逻辑就是用了一个TimerTask来实现了一个定时任务，设置了internalLockLeaseTime &#x2F; 3的时长进行一次锁续期。默认的超时时长是30s，那么他会每10s进行一次续期，通过LUA脚本进行续期，再续30s</p>
-<p>不过，这个续期也不是无脑续，他也是有条件的，其中ExpirationEntry ent &#x3D; EXPIRATION_RENEWAL_MAP.get(getEntryName());这个值得我们关注，他会从EXPIRATION_RENEWAL_MAP中尝试获取一个KV对，如果查不到，就不续期了。</p>
-<p>EXPIRATION_RENEWAL_MAP这个东西，会在unlock的时候操作的，对他进行remove，所以一个锁如果被解了，那么就不会再继续续期了：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">unlock</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        get(unlockAsync(Thread.currentThread().getId()));</span><br><span class="line">    &#125; <span class="keyword">catch</span> (RedisException e) &#123;</span><br><span class="line">        <span class="keyword">if</span> (e.getCause() <span class="keyword">instanceof</span> IllegalMonitorStateException) &#123;</span><br><span class="line">            <span class="keyword">throw</span> (IllegalMonitorStateException) e.getCause();</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="keyword">throw</span> e;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="keyword">public</span> RFuture&lt;Void&gt; <span class="title function_">unlockAsync</span><span class="params">(<span class="type">long</span> threadId)</span> &#123;</span><br><span class="line">    <span class="keyword">return</span> getServiceManager().execute(() -&gt; unlockAsync0(threadId));</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span> RFuture&lt;Void&gt; <span class="title function_">unlockAsync0</span><span class="params">(<span class="type">long</span> threadId)</span> &#123;</span><br><span class="line">    CompletionStage&lt;Boolean&gt; future = unlockInnerAsync(threadId);</span><br><span class="line">    CompletionStage&lt;Void&gt; f = future.handle((opStatus, e) -&gt; &#123;</span><br><span class="line">        cancelExpirationRenewal(threadId);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (e != <span class="literal">null</span>) &#123;</span><br><span class="line">            <span class="keyword">if</span> (e <span class="keyword">instanceof</span> CompletionException) &#123;</span><br><span class="line">                <span class="keyword">throw</span> (CompletionException) e;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">CompletionException</span>(e);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (opStatus == <span class="literal">null</span>) &#123;</span><br><span class="line">            <span class="type">IllegalMonitorStateException</span> <span class="variable">cause</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">IllegalMonitorStateException</span>(<span class="string">&quot;attempt to unlock lock, not locked by current thread by node id: &quot;</span></span><br><span class="line">                    + id + <span class="string">&quot; thread-id: &quot;</span> + threadId);</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">CompletionException</span>(cause);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">    &#125;);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> <span class="title class_">CompletableFutureWrapper</span>&lt;&gt;(f);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title function_">cancelExpirationRenewal</span><span class="params">(Long threadId)</span> &#123;</span><br><span class="line">    <span class="type">ExpirationEntry</span> <span class="variable">task</span> <span class="operator">=</span> EXPIRATION_RENEWAL_MAP.get(getEntryName());</span><br><span class="line">    <span class="keyword">if</span> (task == <span class="literal">null</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> (threadId != <span class="literal">null</span>) &#123;</span><br><span class="line">        task.removeThreadId(threadId);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (threadId == <span class="literal">null</span> || task.hasNoThreads()) &#123;</span><br><span class="line">        <span class="type">Timeout</span> <span class="variable">timeout</span> <span class="operator">=</span> task.getTimeout();</span><br><span class="line">        <span class="keyword">if</span> (timeout != <span class="literal">null</span>) &#123;</span><br><span class="line">            timeout.cancel();</span><br><span class="line">        &#125;</span><br><span class="line">        EXPIRATION_RENEWAL_MAP.remove(getEntryName());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-
-
-<p>以上代码，第4行-&gt;16行-&gt;22行-&gt;57行。就是一次unlock过程中，对EXPIRATION_RENEWAL_MAP进行移除，进而取消下一次锁续期的实现细节。</p>
-<p>并且在unlockAsync方法中，不管unlockInnerAsync是否执行成功，还是抛了异常，都不影响cancelExpirationRenewal的执行，也可以理解为，只要unlock方法被调用了，即使解锁未成功，那么也可以停止下一次的锁续期。</p>
-<p><strong>什么情况会进行续期</strong></p>
-<p>当我们使用Redisson创建一个分布式锁的时候，并不是所有情况都会续期的，我们可以看下以下加锁过程的代码实现：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> RFuture&lt;Long&gt; <span class="title function_">tryAcquireAsync</span><span class="params">(<span class="type">long</span> waitTime, <span class="type">long</span> leaseTime, TimeUnit unit, <span class="type">long</span> threadId)</span> &#123;</span><br><span class="line">    RFuture&lt;Long&gt; ttlRemainingFuture;</span><br><span class="line">    <span class="keyword">if</span> (leaseTime &gt; <span class="number">0</span>) &#123;</span><br><span class="line">        ttlRemainingFuture = tryLockInnerAsync(waitTime, leaseTime, unit, threadId, RedisCommands.EVAL_LONG);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        ttlRemainingFuture = tryLockInnerAsync(waitTime, internalLockLeaseTime,</span><br><span class="line">                TimeUnit.MILLISECONDS, threadId, RedisCommands.EVAL_LONG);</span><br><span class="line">    &#125;</span><br><span class="line">    CompletionStage&lt;Long&gt; s = handleNoSync(threadId, ttlRemainingFuture);</span><br><span class="line">    ttlRemainingFuture = <span class="keyword">new</span> <span class="title class_">CompletableFutureWrapper</span>&lt;&gt;(s);</span><br><span class="line"></span><br><span class="line">    CompletionStage&lt;Long&gt; f = ttlRemainingFuture.thenApply(ttlRemaining -&gt; &#123;</span><br><span class="line">        <span class="comment">// lock acquired</span></span><br><span class="line">        <span class="keyword">if</span> (ttlRemaining == <span class="literal">null</span>) &#123;</span><br><span class="line">            <span class="keyword">if</span> (leaseTime &gt; <span class="number">0</span>) &#123;</span><br><span class="line">                internalLockLeaseTime = unit.toMillis(leaseTime);</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                scheduleExpirationRenewal(threadId);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> ttlRemaining;</span><br><span class="line">    &#125;);</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> <span class="title class_">CompletableFutureWrapper</span>&lt;&gt;(f);</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-<p><strong>什么情况会停止续期</strong></p>
-<p>如果一个锁的unlock方法被调用了，那么就会停止续期。</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title function_">cancelExpirationRenewal</span><span class="params">(Long threadId)</span> &#123;</span><br><span class="line">    <span class="type">ExpirationEntry</span> <span class="variable">task</span> <span class="operator">=</span> EXPIRATION_RENEWAL_MAP.get(getEntryName());</span><br><span class="line">    <span class="keyword">if</span> (task == <span class="literal">null</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> (threadId != <span class="literal">null</span>) &#123;</span><br><span class="line">        task.removeThreadId(threadId);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (threadId == <span class="literal">null</span> || task.hasNoThreads()) &#123;</span><br><span class="line">        <span class="type">Timeout</span> <span class="variable">timeout</span> <span class="operator">=</span> task.getTimeout();</span><br><span class="line">        <span class="keyword">if</span> (timeout != <span class="literal">null</span>) &#123;</span><br><span class="line">            timeout.cancel();</span><br><span class="line">        &#125;</span><br><span class="line">        EXPIRATION_RENEWAL_MAP.remove(getEntryName());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-
-
-<p>主要就是通过EXPIRATION_RENEWAL_MAP.remove来做的。那么cancelExpirationRenewal还有下面一处调用：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title function_">scheduleExpirationRenewal</span><span class="params">(<span class="type">long</span> threadId)</span> &#123;</span><br><span class="line">    <span class="type">ExpirationEntry</span> <span class="variable">entry</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">ExpirationEntry</span>();</span><br><span class="line">    <span class="type">ExpirationEntry</span> <span class="variable">oldEntry</span> <span class="operator">=</span> EXPIRATION_RENEWAL_MAP.putIfAbsent(getEntryName(), entry);</span><br><span class="line">    <span class="keyword">if</span> (oldEntry != <span class="literal">null</span>) &#123;</span><br><span class="line">        oldEntry.addThreadId(threadId);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        entry.addThreadId(threadId);</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            renewExpiration();</span><br><span class="line">        &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">            <span class="keyword">if</span> (Thread.currentThread().isInterrupted()) &#123;</span><br><span class="line">                cancelExpirationRenewal(threadId);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>也就是说，在尝试开启续期的过程中，如果线程被中断了，那么就会取消续期动作了。</p>
-<p>目前，Redisson是没有针对最大续期次数和最大续期时间的支持的。所以，正常情况下，如果没有解锁，是会一直续期下去的。</p>
-<p>但是需要注意的是，Redisson的续期是Netty的时间轮（TimerTask、Timeout、Timer）的，并且操作都是基于JVM的，所以，当应用宕机、下线或者重启后，续期任务就没有了。这样也能在一定程度上避免机器挂了但是锁一直不释放导致的死锁问题。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1258,7 +1251,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">21</span>
+          <span class="site-state-item-count">23</span>
           <span class="site-state-item-name">博客</span>
         </a>
       </div>
