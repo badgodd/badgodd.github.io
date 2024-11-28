@@ -10,7 +10,7 @@
 <p>主从延迟：在主从复制的数据库架构中，DDL 操作需要同步到从库。如果高峰期有大量写入操作，DDL 操作可能会增加主从同步延迟。</p>
 ]]></content>
       <categories>
-        <category>mysql</category>
+        <category>MySql</category>
       </categories>
   </entry>
   <entry>
@@ -113,6 +113,37 @@
       </tags>
   </entry>
   <entry>
+    <title>Young GC过于频繁</title>
+    <url>/2023/03/13/Young-GC%E8%BF%87%E4%BA%8E%E9%A2%91%E7%B9%81/</url>
+    <content><![CDATA[<h2 id="背景知识-background"><a href="#背景知识-background" class="headerlink" title="背景知识 (background)"></a>背景知识 (background)</h2><p>Young GC过于频繁，主要有以下影响：</p>
+<p>GC线程消耗的CPU时间过多，容易触发Linux CFS 限制进程的CPU<br>虽然单次GC停顿较短，但频次高了之后，整个服务的吞吐量会下降<br>GC过于频繁，慢请求产生的临时对象经过几轮YoungGC后容易晋升到老年代<br>目前YoungGC一分钟超过60次，则会触发报警，建议控制在20次&#x2F;分钟以内。</p>
+<h2 id="查看指标-dashboard"><a href="#查看指标-dashboard" class="headerlink" title="查看指标 (dashboard)"></a>查看指标 (dashboard)</h2><p>展开: JVM &#x2F; 内存 &#x2F; GC &#x2F; ClassLoader这一行，找到监控面板：GC耗时 和 GC原因与频次。</p>
+<p><img src="/2023/03/13/Young-GC%E8%BF%87%E4%BA%8E%E9%A2%91%E7%B9%81/image-20231013105605631.png" alt="image-20231013105605631"></p>
+<h2 id="止损措施-action"><a href="#止损措施-action" class="headerlink" title="止损措施 (action)"></a>止损措施 (action)</h2><p>Young GC频繁，通常不用立即处理，大多需要优化代码。</p>
+<p>不同物理机的配置、性能各异，若因CPU限制导致长尾请求集中在某个节点上，可先摘流。</p>
+<p>事后改进(postmortem)<br>Young GC过于频繁，说明JVM内存分配压力大，可能是Young区比较小或者代码加载到内存的数据过多。</p>
+<p>可参考原因部分，优化代码，调整GC参数。</p>
+<p>尽量一次调整一个GC参数，灰度观察，排除干扰数据</p>
+<h2 id="可能的原因-cause"><a href="#可能的原因-cause" class="headerlink" title="可能的原因 (cause)"></a>可能的原因 (cause)</h2><p>YoungGC频繁一般是内存问题，在优化代码降低频率的同时，也需关注某个时间段的累计耗时。总的来说，在CPU Quota允许的范围内，GC总耗时越少越好，GC频率反倒不是那么重要。</p>
+<p>一、Eden区过小<br>g1 newSizePercent</p>
+<p>二. 大批量加载数据。</p>
+<p>三. 内存分配速率过高</p>
+<p>代码原因导致的数据加载过多，常见于：</p>
+<ol>
+<li>文件上传下载、报表导入导出</li>
+<li>数据量随业务发展突增，代码没有分页或没有限制分页大小，或部分请求参数组合导致返回了大量数据</li>
+<li>业务逻辑涉及的内存全量加载到内存里计算，不复用中间结果，相同的数据重复请求</li>
+<li>Redis缓存了大List，导致序列化&#x2F;反序列化临时对象过多</li>
+</ol>
+]]></content>
+      <categories>
+        <category>JVM</category>
+      </categories>
+      <tags>
+        <tag>GC</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>git使用中 error: pathspec ‘xxx‘ did not match any file(s) known to git 报错解决方法</title>
     <url>/2022/01/03/git%E4%BD%BF%E7%94%A8%E4%B8%AD-error-pathspec-%E2%80%98xxx%E2%80%98-did-not-match-any-file-s-known-to-git-%E6%8A%A5%E9%94%99%E8%A7%A3%E5%86%B3%E6%96%B9%E6%B3%95/</url>
     <content><![CDATA[<h2 id="一、问题描述"><a href="#一、问题描述" class="headerlink" title="一、问题描述"></a>一、问题描述</h2><p>项目上想合并代码，以自己的分支master作为主分支，要合并分支study，结果<br>在 git merge study 的时候报如下错误<br>其实在 git checkout 的时候也会出现这个错误</p>
@@ -153,39 +184,8 @@
       </tags>
   </entry>
   <entry>
-    <title>Young GC过于频繁</title>
-    <url>/2023/03/13/Young-GC%E8%BF%87%E4%BA%8E%E9%A2%91%E7%B9%81/</url>
-    <content><![CDATA[<h2 id="背景知识-background"><a href="#背景知识-background" class="headerlink" title="背景知识 (background)"></a>背景知识 (background)</h2><p>Young GC过于频繁，主要有以下影响：</p>
-<p>GC线程消耗的CPU时间过多，容易触发Linux CFS 限制进程的CPU<br>虽然单次GC停顿较短，但频次高了之后，整个服务的吞吐量会下降<br>GC过于频繁，慢请求产生的临时对象经过几轮YoungGC后容易晋升到老年代<br>目前YoungGC一分钟超过60次，则会触发报警，建议控制在20次&#x2F;分钟以内。</p>
-<h2 id="查看指标-dashboard"><a href="#查看指标-dashboard" class="headerlink" title="查看指标 (dashboard)"></a>查看指标 (dashboard)</h2><p>展开: JVM &#x2F; 内存 &#x2F; GC &#x2F; ClassLoader这一行，找到监控面板：GC耗时 和 GC原因与频次。</p>
-<p><img src="/2023/03/13/Young-GC%E8%BF%87%E4%BA%8E%E9%A2%91%E7%B9%81/image-20231013105605631.png" alt="image-20231013105605631"></p>
-<h2 id="止损措施-action"><a href="#止损措施-action" class="headerlink" title="止损措施 (action)"></a>止损措施 (action)</h2><p>Young GC频繁，通常不用立即处理，大多需要优化代码。</p>
-<p>不同物理机的配置、性能各异，若因CPU限制导致长尾请求集中在某个节点上，可先摘流。</p>
-<p>事后改进(postmortem)<br>Young GC过于频繁，说明JVM内存分配压力大，可能是Young区比较小或者代码加载到内存的数据过多。</p>
-<p>可参考原因部分，优化代码，调整GC参数。</p>
-<p>尽量一次调整一个GC参数，灰度观察，排除干扰数据</p>
-<h2 id="可能的原因-cause"><a href="#可能的原因-cause" class="headerlink" title="可能的原因 (cause)"></a>可能的原因 (cause)</h2><p>YoungGC频繁一般是内存问题，在优化代码降低频率的同时，也需关注某个时间段的累计耗时。总的来说，在CPU Quota允许的范围内，GC总耗时越少越好，GC频率反倒不是那么重要。</p>
-<p>一、Eden区过小<br>g1 newSizePercent</p>
-<p>二. 大批量加载数据。</p>
-<p>三. 内存分配速率过高</p>
-<p>代码原因导致的数据加载过多，常见于：</p>
-<ol>
-<li>文件上传下载、报表导入导出</li>
-<li>数据量随业务发展突增，代码没有分页或没有限制分页大小，或部分请求参数组合导致返回了大量数据</li>
-<li>业务逻辑涉及的内存全量加载到内存里计算，不复用中间结果，相同的数据重复请求</li>
-<li>Redis缓存了大List，导致序列化&#x2F;反序列化临时对象过多</li>
-</ol>
-]]></content>
-      <categories>
-        <category>JVM</category>
-      </categories>
-      <tags>
-        <tag>GC</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>一个查询语句的执行顺序是怎么样的</title>
-    <url>/2024/11/27/%E4%B8%80%E4%B8%AA%E6%9F%A5%E8%AF%A2%E8%AF%AD%E5%8F%A5%E7%9A%84%E6%89%A7%E8%A1%8C%E9%A1%BA%E5%BA%8F%E6%98%AF%E6%80%8E%E4%B9%88%E6%A0%B7%E7%9A%84/</url>
+    <url>/2023/06/27/%E4%B8%80%E4%B8%AA%E6%9F%A5%E8%AF%A2%E8%AF%AD%E5%8F%A5%E7%9A%84%E6%89%A7%E8%A1%8C%E9%A1%BA%E5%BA%8F%E6%98%AF%E6%80%8E%E4%B9%88%E6%A0%B7%E7%9A%84/</url>
     <content><![CDATA[<p>以下是一个比较典型的查询语句，其中包含了很多子句，其中有SELECT、FROM、JOIN、WHERE、GROUP BY、HAVING、ORDER BY和LIMIT。</p>
 <figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">SELECT name, COUNT(*)</span><br><span class="line">FROM employees</span><br><span class="line">JOIN departments ON employees.department_id = departments.id</span><br><span class="line">WHERE employees.salary &gt; 50000</span><br><span class="line">GROUP BY departments.name</span><br><span class="line">HAVING COUNT(*) &gt; 10</span><br><span class="line">ORDER BY name</span><br><span class="line">LIMIT 5;</span><br></pre></td></tr></table></figure>
 
@@ -240,30 +240,6 @@
       </tags>
   </entry>
   <entry>
-    <title>如何基于Redis实现滑动窗口限流</title>
-    <url>/2023/11/02/%E5%A6%82%E4%BD%95%E5%9F%BA%E4%BA%8ERedis%E5%AE%9E%E7%8E%B0%E6%BB%91%E5%8A%A8%E7%AA%97%E5%8F%A3%E9%99%90%E6%B5%81/</url>
-    <content><![CDATA[<p>​		滑动窗口限流是一种流量控制策略，用于控制在一定时间内允许执行的操作数量或请求频率。它的工作方式类似于一个滑动时间窗口，在窗口内允许的操作数量是固定的，窗口会随着时间的推移不断滑动。</p>
-<p>​		滑动窗口限流的主要优点是可以在时间内平滑地控制流量，而不是简单地设置固定的请求数或速率。这使得系统可以更灵活地应对突发流量或峰值流量，而不会因为固定速率的限制而浪费资源或降低系统性能。</p>
-<p>利用Redis，我们就可以实现一个简单的滑动窗口限流的功能。因为滑动窗口和时间有关，所以很容易能想到要基于时间进行统计。</p>
-<p>那么我们只需要在每一次有请求进来的时候，记录下请求的时间戳和请求的数据，然后在统计窗口内请求的数量时，只需要统计窗口内的被记录的数据量有多少条就行了。</p>
-<p>在Redis中，我们可以基于ZSET来实现这个功能。假如我们限定login接口一分钟只能调用100次：</p>
-<p>那么，我们就可以把login接口这个需要做限流的资源名作为key在redis中进行存储，然后value我们现在ZSET这种数据结构，把他的score设置为当前请求的时间戳，member的话建议用请求的详情的hash进行存储（或者UUID、MD5什么的），避免在并发时，时间戳一致出现score和memberv一样导致被zadd幂等的问题。</p>
-<p><img src="/2023/11/02/%E5%A6%82%E4%BD%95%E5%9F%BA%E4%BA%8ERedis%E5%AE%9E%E7%8E%B0%E6%BB%91%E5%8A%A8%E7%AA%97%E5%8F%A3%E9%99%90%E6%B5%81/image-20241126170238331.png" alt="image-20241126170238331"></p>
-<p>主要步骤如下： </p>
-<p>1定义滑动窗口的时间范围，例如，窗口大小为60秒。<br>2每次收到一个请求时，我们就定义出一个zset然后存储到redis中。<br>3然后再通过ZREMRANGEBYSCORE命令来删除分值小于窗口起始时间戳（当前时间戳-60s）的数据。<br>4最后，再使用ZCARD命令来获取有序集合中的成员数量，即在窗口内的请求量。</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">import</span> redis.clients.jedis.Jedis;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">SlidingWindowRateLimiter</span> &#123;</span><br><span class="line">    <span class="keyword">private</span> Jedis jedis;</span><br><span class="line">    <span class="keyword">private</span> String key;</span><br><span class="line">    <span class="keyword">private</span> <span class="type">int</span> limit;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="type">boolean</span> <span class="title function_">allowRequest</span><span class="params">(String key)</span> &#123;</span><br><span class="line">        <span class="comment">//当前时间戳</span></span><br><span class="line">        <span class="type">long</span> <span class="variable">currentTime</span> <span class="operator">=</span> System.currentTimeMillis();</span><br><span class="line">        <span class="comment">//窗口开始时间是当前时间减60s</span></span><br><span class="line">        <span class="type">long</span> <span class="variable">windowStart</span> <span class="operator">=</span> currentTime - <span class="number">60</span> * <span class="number">1000</span>;</span><br><span class="line">        <span class="comment">//删除窗口开始时间之前的所有数据</span></span><br><span class="line">        jedis.zremrangeByScore(key, <span class="string">&quot;-inf&quot;</span>, String.valueOf(windowStart));</span><br><span class="line">        <span class="comment">//计算总请求数</span></span><br><span class="line">        <span class="type">long</span> <span class="variable">currentRequests</span> <span class="operator">=</span> jedis.zcard(key);</span><br><span class="line">    	<span class="comment">//窗口足够则把当前请求加入</span></span><br><span class="line">        <span class="keyword">if</span> (currentRequests &lt; limit) &#123;</span><br><span class="line">            jedis.zadd(key, currentTime, String.valueOf(currentTime));</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-
-
-<p>以上代码在高并发情况下，可能会存在原子性的问题，需要考虑加事务或者lua脚本：</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">import</span> redis.clients.jedis.Jedis;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">SlidingWindowRateLimiter</span> &#123;</span><br><span class="line">    <span class="keyword">private</span> Jedis jedis;</span><br><span class="line">    <span class="keyword">private</span> String key;</span><br><span class="line">    <span class="keyword">private</span> <span class="type">int</span> limit;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="title function_">SlidingWindowRateLimiter</span><span class="params">(Jedis jedis, String key, <span class="type">int</span> limit)</span> &#123;</span><br><span class="line">        <span class="built_in">this</span>.jedis = jedis;</span><br><span class="line">        <span class="built_in">this</span>.key = key;</span><br><span class="line">        <span class="built_in">this</span>.limit = limit;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="type">boolean</span> <span class="title function_">allowRequest</span><span class="params">(String key)</span> &#123;</span><br><span class="line">        <span class="comment">// 当前时间戳</span></span><br><span class="line">        <span class="type">long</span> <span class="variable">currentTime</span> <span class="operator">=</span> System.currentTimeMillis();</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 使用Lua脚本来确保原子性操作</span></span><br><span class="line">        <span class="type">String</span> <span class="variable">luaScript</span> <span class="operator">=</span> <span class="string">&quot;local window_start = ARGV[1] - 60000\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;redis.call(&#x27;ZREMRANGEBYSCORE&#x27;, KEYS[1], &#x27;-inf&#x27;, window_start)\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;local current_requests = redis.call(&#x27;ZCARD&#x27;, KEYS[1])\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;if current_requests &lt; tonumber(ARGV[2]) then\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;    redis.call(&#x27;ZADD&#x27;, KEYS[1], ARGV[1], ARGV[1])\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;    return 1\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;else\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;    return 0\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;end&quot;</span>;</span><br><span class="line"></span><br><span class="line">        <span class="type">Object</span> <span class="variable">result</span> <span class="operator">=</span> jedis.eval(luaScript, <span class="number">1</span>, key, String.valueOf(currentTime), String.valueOf(limit));</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">return</span> (Long) result == <span class="number">1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-]]></content>
-      <tags>
-        <tag>Redis</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>如何保证本地缓存的一致性</title>
     <url>/2024/10/05/%E5%A6%82%E4%BD%95%E4%BF%9D%E8%AF%81%E6%9C%AC%E5%9C%B0%E7%BC%93%E5%AD%98%E7%9A%84%E4%B8%80%E8%87%B4%E6%80%A7/</url>
     <content><![CDATA[<p>本地缓存和分布式缓存相比有很多优点，但是最大的缺点就是存在着一致性的问题。于是就衍生出这个问题：如何保证本地缓存的一致性。</p>
@@ -288,6 +264,58 @@
 ]]></content>
       <categories>
         <category>本地缓存</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>如何基于Redis实现滑动窗口限流</title>
+    <url>/2023/11/02/%E5%A6%82%E4%BD%95%E5%9F%BA%E4%BA%8ERedis%E5%AE%9E%E7%8E%B0%E6%BB%91%E5%8A%A8%E7%AA%97%E5%8F%A3%E9%99%90%E6%B5%81/</url>
+    <content><![CDATA[<p>​		滑动窗口限流是一种流量控制策略，用于控制在一定时间内允许执行的操作数量或请求频率。它的工作方式类似于一个滑动时间窗口，在窗口内允许的操作数量是固定的，窗口会随着时间的推移不断滑动。</p>
+<p>​		滑动窗口限流的主要优点是可以在时间内平滑地控制流量，而不是简单地设置固定的请求数或速率。这使得系统可以更灵活地应对突发流量或峰值流量，而不会因为固定速率的限制而浪费资源或降低系统性能。</p>
+<p>利用Redis，我们就可以实现一个简单的滑动窗口限流的功能。因为滑动窗口和时间有关，所以很容易能想到要基于时间进行统计。</p>
+<p>那么我们只需要在每一次有请求进来的时候，记录下请求的时间戳和请求的数据，然后在统计窗口内请求的数量时，只需要统计窗口内的被记录的数据量有多少条就行了。</p>
+<p>在Redis中，我们可以基于ZSET来实现这个功能。假如我们限定login接口一分钟只能调用100次：</p>
+<p>那么，我们就可以把login接口这个需要做限流的资源名作为key在redis中进行存储，然后value我们现在ZSET这种数据结构，把他的score设置为当前请求的时间戳，member的话建议用请求的详情的hash进行存储（或者UUID、MD5什么的），避免在并发时，时间戳一致出现score和memberv一样导致被zadd幂等的问题。</p>
+<p><img src="/2023/11/02/%E5%A6%82%E4%BD%95%E5%9F%BA%E4%BA%8ERedis%E5%AE%9E%E7%8E%B0%E6%BB%91%E5%8A%A8%E7%AA%97%E5%8F%A3%E9%99%90%E6%B5%81/image-20241126170238331.png" alt="image-20241126170238331"></p>
+<p>主要步骤如下： </p>
+<p>1定义滑动窗口的时间范围，例如，窗口大小为60秒。<br>2每次收到一个请求时，我们就定义出一个zset然后存储到redis中。<br>3然后再通过ZREMRANGEBYSCORE命令来删除分值小于窗口起始时间戳（当前时间戳-60s）的数据。<br>4最后，再使用ZCARD命令来获取有序集合中的成员数量，即在窗口内的请求量。</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">import</span> redis.clients.jedis.Jedis;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">SlidingWindowRateLimiter</span> &#123;</span><br><span class="line">    <span class="keyword">private</span> Jedis jedis;</span><br><span class="line">    <span class="keyword">private</span> String key;</span><br><span class="line">    <span class="keyword">private</span> <span class="type">int</span> limit;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="type">boolean</span> <span class="title function_">allowRequest</span><span class="params">(String key)</span> &#123;</span><br><span class="line">        <span class="comment">//当前时间戳</span></span><br><span class="line">        <span class="type">long</span> <span class="variable">currentTime</span> <span class="operator">=</span> System.currentTimeMillis();</span><br><span class="line">        <span class="comment">//窗口开始时间是当前时间减60s</span></span><br><span class="line">        <span class="type">long</span> <span class="variable">windowStart</span> <span class="operator">=</span> currentTime - <span class="number">60</span> * <span class="number">1000</span>;</span><br><span class="line">        <span class="comment">//删除窗口开始时间之前的所有数据</span></span><br><span class="line">        jedis.zremrangeByScore(key, <span class="string">&quot;-inf&quot;</span>, String.valueOf(windowStart));</span><br><span class="line">        <span class="comment">//计算总请求数</span></span><br><span class="line">        <span class="type">long</span> <span class="variable">currentRequests</span> <span class="operator">=</span> jedis.zcard(key);</span><br><span class="line">    	<span class="comment">//窗口足够则把当前请求加入</span></span><br><span class="line">        <span class="keyword">if</span> (currentRequests &lt; limit) &#123;</span><br><span class="line">            jedis.zadd(key, currentTime, String.valueOf(currentTime));</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+
+
+<p>以上代码在高并发情况下，可能会存在原子性的问题，需要考虑加事务或者lua脚本：</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">import</span> redis.clients.jedis.Jedis;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">SlidingWindowRateLimiter</span> &#123;</span><br><span class="line">    <span class="keyword">private</span> Jedis jedis;</span><br><span class="line">    <span class="keyword">private</span> String key;</span><br><span class="line">    <span class="keyword">private</span> <span class="type">int</span> limit;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="title function_">SlidingWindowRateLimiter</span><span class="params">(Jedis jedis, String key, <span class="type">int</span> limit)</span> &#123;</span><br><span class="line">        <span class="built_in">this</span>.jedis = jedis;</span><br><span class="line">        <span class="built_in">this</span>.key = key;</span><br><span class="line">        <span class="built_in">this</span>.limit = limit;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="type">boolean</span> <span class="title function_">allowRequest</span><span class="params">(String key)</span> &#123;</span><br><span class="line">        <span class="comment">// 当前时间戳</span></span><br><span class="line">        <span class="type">long</span> <span class="variable">currentTime</span> <span class="operator">=</span> System.currentTimeMillis();</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 使用Lua脚本来确保原子性操作</span></span><br><span class="line">        <span class="type">String</span> <span class="variable">luaScript</span> <span class="operator">=</span> <span class="string">&quot;local window_start = ARGV[1] - 60000\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;redis.call(&#x27;ZREMRANGEBYSCORE&#x27;, KEYS[1], &#x27;-inf&#x27;, window_start)\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;local current_requests = redis.call(&#x27;ZCARD&#x27;, KEYS[1])\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;if current_requests &lt; tonumber(ARGV[2]) then\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;    redis.call(&#x27;ZADD&#x27;, KEYS[1], ARGV[1], ARGV[1])\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;    return 1\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;else\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;    return 0\n&quot;</span> +</span><br><span class="line">                           <span class="string">&quot;end&quot;</span>;</span><br><span class="line"></span><br><span class="line">        <span class="type">Object</span> <span class="variable">result</span> <span class="operator">=</span> jedis.eval(luaScript, <span class="number">1</span>, key, String.valueOf(currentTime), String.valueOf(limit));</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">return</span> (Long) result == <span class="number">1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+]]></content>
+      <tags>
+        <tag>Redis</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>如何基于本地消息表实现分布式事务</title>
+    <url>/2024/08/18/%E5%A6%82%E4%BD%95%E5%9F%BA%E4%BA%8E%E6%9C%AC%E5%9C%B0%E6%B6%88%E6%81%AF%E8%A1%A8%E5%AE%9E%E7%8E%B0%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1/</url>
+    <content><![CDATA[<p>本地消息表其实也是借助消息来实现分布式事务的。</p>
+<h4 id="实现"><a href="#实现" class="headerlink" title="实现"></a>实现</h4><p>这个方案的<strong>主要思想是将分布式事务拆分为本地事务和消息事务两个部分</strong>，本地事务在本地数据库中进行提交或回滚，而消息事务则将消息写入消息中间件中，以实现消息的可靠投递和顺序性。</p>
+<p>一般来说的做法是，在发送消息之前，先创建一条本地消息，并且保证写本地业务数据的操作，和，写本地消息记录的操作在同一个事务中。这样就能确保只要业务操作成功，本地消息一定可以写成功。</p>
+<p><img src="/2024/08/18/%E5%A6%82%E4%BD%95%E5%9F%BA%E4%BA%8E%E6%9C%AC%E5%9C%B0%E6%B6%88%E6%81%AF%E8%A1%A8%E5%AE%9E%E7%8E%B0%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1/image-20241128164941565.png" alt="image-20241128164941565"></p>
+<p>然后再基于本地消息，调用MQ发送远程消息。</p>
+<p>消息发出去之后，等待消费者消费，在消费者端，接收到消息之后，做业务处理，处理成功后再修改本地消息表的状态。</p>
+<p>这个过程中，可能有几个步骤都可能发生失败，那么如果失败了怎么办呢？</p>
+<p>1、2如果失败，因为在同一个事务中，所以事务会回滚，3及以后的步骤都不会执行。数据是一致的。</p>
+<p>3如果失败，那么就需要有一个定时任务，不断的扫描本地消息数据，对于未成功的消息进行重新投递。</p>
+<p>4、5如果失败，则依靠消息的重投机制，不断地重试。</p>
+<p>6、7如果失败，那么就相当于两个分布式系统中的业务数据已经一致了，但是本地消息表的状态还是错的。这种情况也可以借助定时任务继续重投消息，让下游幂等消费再重新更改消息状态，或者本系统也可以通过定时任务去查询下游系统的状态，如果已经成功了，则直接推进消息状态即可。</p>
+<p><img src="/2024/08/18/%E5%A6%82%E4%BD%95%E5%9F%BA%E4%BA%8E%E6%9C%AC%E5%9C%B0%E6%B6%88%E6%81%AF%E8%A1%A8%E5%AE%9E%E7%8E%B0%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1/image-20241128165109107.png" alt="image-20241128165109107"></p>
+<h4 id="优缺点"><a href="#优缺点" class="headerlink" title="优缺点"></a>优缺点</h4><p>优点：</p>
+<p>1可靠性高：基于本地消息表实现分布式事务，可以将本地消息的持久化和本地业务逻辑操作，放到一个事务中执行进行原子性的提交，从而保证了消息的可靠性。</p>
+<p>2可扩展性好：基于本地消息表实现分布式事务，可以将消息的发送和本地事务的执行分开处理，从而提高了系统的可扩展性。</p>
+<p>3适用范围广：基于本地消息表实现分布式事务，可以适用于多种不同的业务场景，可以满足不同业务场景下的需求。</p>
+<p>缺点：</p>
+<p>1实现复杂度高：基于本地消息表实现分布式事务，需要设计复杂的事务协议和消息发送机制，并且需要进行相应的异常处理和补偿操作，因此实现复杂度较高。</p>
+<p>2系统性能受限：基于本地消息表实现分布式事务，需要将消息写入本地消息表，并且需要定时扫描本地消息表进行消息发送，因此对系统性能有一定影响。</p>
+<p>3会带来消息堆积扫表慢、集中式扫表会影响正常业务、定时扫表存在延迟问题等问题。</p>
+]]></content>
+      <categories>
+        <category>分布式</category>
       </categories>
   </entry>
   <entry>
@@ -475,6 +503,49 @@
       </categories>
   </entry>
   <entry>
+    <title>MySQL中如何查看一个 SQL 的执行耗时</title>
+    <url>/2024/02/23/%E7%9A%84%E6%89%A7%E8%A1%8C%E8%80%97%E6%97%B6/</url>
+    <content><![CDATA[<p>在 MySQL 中，有的时候我们想要知道一个 SQL 的执行耗时有多少，有些数据库管理工具客户端是可以直接返回一个执行时长的，但是，如果没有这种工具怎么办呢？如何查看一个 SQL 的耗时情况呢？</p>
+<p>有两种办法，如果是 MySQL 8.0之前，可以用SHOW PROFILES、如果是 MySQL 8.0之后的版本，可以用EXPLAIN ANALYZE</p>
+<h4 id="SHOW-PROFILES"><a href="#SHOW-PROFILES" class="headerlink" title="SHOW PROFILES"></a>SHOW PROFILES</h4><p>SHOW PROFILES 是 MySQL 提供的一种用于查看查询执行概要信息的命令。它能够显示当前会话中最近执行的 SQL 语句的性能数据，包括每条语句的执行时间和详细的执行阶段耗时。</p>
+<p>想要使用这个功能，需要先开启profiling：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">-- 启用 Profiling</span><br><span class="line">SET profiling = 1;</span><br></pre></td></tr></table></figure>
+
+
+
+<p>启动之后，执行你自己的 SQL 即可：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">-- 执行查询</span><br><span class="line">select * from t1;</span><br></pre></td></tr></table></figure>
+
+
+
+<p>之后，通过SHOW PROFILES查询概要信息：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">-- 查看 Profiles</span><br><span class="line">SHOW PROFILES;</span><br><span class="line"></span><br><span class="line">+----------+------------+------------------+                                                                                                                 </span><br><span class="line">| Query_ID | Duration   | Query            |                                                                                                                 </span><br><span class="line">+----------+------------+------------------+                                                                                                                 </span><br><span class="line">|        1 | 0.00050800 | select * from t1 |                                                                                                                 </span><br><span class="line">+----------+------------+------------------+                                                                                                                 </span><br><span class="line">1 row in set, 1 warning (0.00 sec)   </span><br></pre></td></tr></table></figure>
+
+
+
+<p>这里面显示了刚刚我们执行的SQL的执行情况，耗时是0.00050800秒。</p>
+<p>如果我们的想要查询具体某个 SQL 的耗时详细信息，也可以通过SHOW PROFILE FOR QUERY 命令：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">-- 查看特定查询的详细信息</span><br><span class="line">SHOW PROFILE FOR QUERY 1;</span><br><span class="line"></span><br><span class="line">+--------------------------------+----------+                                                                                                                </span><br><span class="line">| Status                         | Duration |                                                                                                                </span><br><span class="line">+--------------------------------+----------+                                                                                                                </span><br><span class="line">| starting                       | 0.000124 |                                                                                                                </span><br><span class="line">| Executing hook on transaction  | 0.000008 |                                                                                                                </span><br><span class="line">| starting                       | 0.000013 |                                                                                                                </span><br><span class="line">| checking permissions           | 0.000017 |                                                                                                                </span><br><span class="line">| Opening tables                 | 0.000058 |                                                                                                                </span><br><span class="line">| init                           | 0.000010 |                                                                                                                </span><br><span class="line">| System lock                    | 0.000017 |                                                                                                                </span><br><span class="line">| optimizing                     | 0.000009 |                                                                                                                </span><br><span class="line">| statistics                     | 0.000030 |                                                                                                                </span><br><span class="line">| preparing                      | 0.000036 |                                                                                                                </span><br><span class="line">| executing                      | 0.000076 |                                                                                                                </span><br><span class="line">| end                            | 0.000007 |                                                                                                                </span><br><span class="line">| query end                      | 0.000006 |                                                                                                                </span><br><span class="line">| waiting for handler commit     | 0.000017 |                                                                                                                </span><br><span class="line">| closing tables                 | 0.000016 |                                                                                                                </span><br><span class="line">| freeing items                  | 0.000044 |                                                                                                                </span><br><span class="line">| cleaning up                    | 0.000022 |                                                                                                                </span><br><span class="line">+--------------------------------+----------+                                                                                                                </span><br><span class="line">17 rows in set, 1 warning (0.00 sec) </span><br></pre></td></tr></table></figure>
+
+
+
+<p>这里详细列出了每个阶段（Status）花费的时长。可以帮助我们进行 SQL 的详细分析，其中比较重要的是以下几个：</p>
+<p>1 Opening tables：<br>如果在这个阶段花费的时间较长，可能意味着表的打开操作比较耗时，可能需要检查表的状态、文件系统性能等。</p>
+<p>2 optimizing：<br>这是查询优化的关键阶段。如果在此花费了较多时间，可能需要检查查询的复杂度和索引的使用情况。</p>
+<p>3 statistics：<br>这个阶段涉及收集表和索引的统计信息。如果时间过长，可能需要检查表的统计信息是否需要更新。</p>
+<p>4 Sending data：<br>这是查询执行的核心阶段，包含数据的读取和处理。如果在这里花费了大量时间，通常需要检查查询的效率、数据量和网络传输性能等。</p>
+<h4 id="EXPLAIN-ANALYZE"><a href="#EXPLAIN-ANALYZE" class="headerlink" title="EXPLAIN ANALYZE"></a>EXPLAIN ANALYZE</h4><p> EXPLAIN ANALYZE 是 MySQL 8.0.18 引入的一种功能，它结合了 EXPLAIN 和实际执行查询的分析结果，可以为每个执行计划的步骤提供真实的执行时间和行数。使用 EXPLAIN ANALYZE 可以帮助更准确地了解查询的性能瓶颈，并进行优化。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">explain analyze select * from t1;                                                                                                                     </span><br><span class="line">+-----------------------------------------------------------------------+         </span><br><span class="line">| EXPLAIN                                                               |         </span><br><span class="line">+-----------------------------------------------------------------------+         </span><br><span class="line">| -&gt; Table scan on t1  (cost=0.35 rows=1) (actual time=0.042..0.048 rows=1 loops=1)                                                                      |         </span><br><span class="line">+-----------------------------------------------------------------------+                                                                       </span><br><span class="line">1 row in set (0.00 sec)                                                                                                </span><br></pre></td></tr></table></figure>
+
+
+
+<p>这里的(actual time&#x3D;0.042..0.048 rows&#x3D;1 loops&#x3D;1)，表示实际执行时间和行数。actual time 显示了执行这个步骤的时间范围，rows 显示实际扫描的行数，loops 显示执行这个步骤的次数。</p>
+]]></content>
+      <categories>
+        <category>MySql</category>
+      </categories>
+  </entry>
+  <entry>
     <title>线上问题FullGC</title>
     <url>/2023/06/11/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98FullGC/</url>
     <content><![CDATA[<h2 id="背景知识-background"><a href="#背景知识-background" class="headerlink" title="背景知识 (background)"></a>背景知识 (background)</h2><p>​	FullGC通常伴随着比较久的停顿和性能退化，不过不同GC算法关注点不一样。</p>
@@ -524,49 +595,6 @@
         <tag>GC</tag>
         <tag>线上问题</tag>
       </tags>
-  </entry>
-  <entry>
-    <title>MySQL中如何查看一个 SQL 的执行耗时</title>
-    <url>/2024/02/23/%E7%9A%84%E6%89%A7%E8%A1%8C%E8%80%97%E6%97%B6/</url>
-    <content><![CDATA[<p>在 MySQL 中，有的时候我们想要知道一个 SQL 的执行耗时有多少，有些数据库管理工具客户端是可以直接返回一个执行时长的，但是，如果没有这种工具怎么办呢？如何查看一个 SQL 的耗时情况呢？</p>
-<p>有两种办法，如果是 MySQL 8.0之前，可以用SHOW PROFILES、如果是 MySQL 8.0之后的版本，可以用EXPLAIN ANALYZE</p>
-<h4 id="SHOW-PROFILES"><a href="#SHOW-PROFILES" class="headerlink" title="SHOW PROFILES"></a>SHOW PROFILES</h4><p>SHOW PROFILES 是 MySQL 提供的一种用于查看查询执行概要信息的命令。它能够显示当前会话中最近执行的 SQL 语句的性能数据，包括每条语句的执行时间和详细的执行阶段耗时。</p>
-<p>想要使用这个功能，需要先开启profiling：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">-- 启用 Profiling</span><br><span class="line">SET profiling = 1;</span><br></pre></td></tr></table></figure>
-
-
-
-<p>启动之后，执行你自己的 SQL 即可：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">-- 执行查询</span><br><span class="line">select * from t1;</span><br></pre></td></tr></table></figure>
-
-
-
-<p>之后，通过SHOW PROFILES查询概要信息：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">-- 查看 Profiles</span><br><span class="line">SHOW PROFILES;</span><br><span class="line"></span><br><span class="line">+----------+------------+------------------+                                                                                                                 </span><br><span class="line">| Query_ID | Duration   | Query            |                                                                                                                 </span><br><span class="line">+----------+------------+------------------+                                                                                                                 </span><br><span class="line">|        1 | 0.00050800 | select * from t1 |                                                                                                                 </span><br><span class="line">+----------+------------+------------------+                                                                                                                 </span><br><span class="line">1 row in set, 1 warning (0.00 sec)   </span><br></pre></td></tr></table></figure>
-
-
-
-<p>这里面显示了刚刚我们执行的SQL的执行情况，耗时是0.00050800秒。</p>
-<p>如果我们的想要查询具体某个 SQL 的耗时详细信息，也可以通过SHOW PROFILE FOR QUERY 命令：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">-- 查看特定查询的详细信息</span><br><span class="line">SHOW PROFILE FOR QUERY 1;</span><br><span class="line"></span><br><span class="line">+--------------------------------+----------+                                                                                                                </span><br><span class="line">| Status                         | Duration |                                                                                                                </span><br><span class="line">+--------------------------------+----------+                                                                                                                </span><br><span class="line">| starting                       | 0.000124 |                                                                                                                </span><br><span class="line">| Executing hook on transaction  | 0.000008 |                                                                                                                </span><br><span class="line">| starting                       | 0.000013 |                                                                                                                </span><br><span class="line">| checking permissions           | 0.000017 |                                                                                                                </span><br><span class="line">| Opening tables                 | 0.000058 |                                                                                                                </span><br><span class="line">| init                           | 0.000010 |                                                                                                                </span><br><span class="line">| System lock                    | 0.000017 |                                                                                                                </span><br><span class="line">| optimizing                     | 0.000009 |                                                                                                                </span><br><span class="line">| statistics                     | 0.000030 |                                                                                                                </span><br><span class="line">| preparing                      | 0.000036 |                                                                                                                </span><br><span class="line">| executing                      | 0.000076 |                                                                                                                </span><br><span class="line">| end                            | 0.000007 |                                                                                                                </span><br><span class="line">| query end                      | 0.000006 |                                                                                                                </span><br><span class="line">| waiting for handler commit     | 0.000017 |                                                                                                                </span><br><span class="line">| closing tables                 | 0.000016 |                                                                                                                </span><br><span class="line">| freeing items                  | 0.000044 |                                                                                                                </span><br><span class="line">| cleaning up                    | 0.000022 |                                                                                                                </span><br><span class="line">+--------------------------------+----------+                                                                                                                </span><br><span class="line">17 rows in set, 1 warning (0.00 sec) </span><br></pre></td></tr></table></figure>
-
-
-
-<p>这里详细列出了每个阶段（Status）花费的时长。可以帮助我们进行 SQL 的详细分析，其中比较重要的是以下几个：</p>
-<p>1 Opening tables：<br>如果在这个阶段花费的时间较长，可能意味着表的打开操作比较耗时，可能需要检查表的状态、文件系统性能等。</p>
-<p>2 optimizing：<br>这是查询优化的关键阶段。如果在此花费了较多时间，可能需要检查查询的复杂度和索引的使用情况。</p>
-<p>3 statistics：<br>这个阶段涉及收集表和索引的统计信息。如果时间过长，可能需要检查表的统计信息是否需要更新。</p>
-<p>4 Sending data：<br>这是查询执行的核心阶段，包含数据的读取和处理。如果在这里花费了大量时间，通常需要检查查询的效率、数据量和网络传输性能等。</p>
-<h4 id="EXPLAIN-ANALYZE"><a href="#EXPLAIN-ANALYZE" class="headerlink" title="EXPLAIN ANALYZE"></a>EXPLAIN ANALYZE</h4><p> EXPLAIN ANALYZE 是 MySQL 8.0.18 引入的一种功能，它结合了 EXPLAIN 和实际执行查询的分析结果，可以为每个执行计划的步骤提供真实的执行时间和行数。使用 EXPLAIN ANALYZE 可以帮助更准确地了解查询的性能瓶颈，并进行优化。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">explain analyze select * from t1;                                                                                                                     </span><br><span class="line">+-----------------------------------------------------------------------+         </span><br><span class="line">| EXPLAIN                                                               |         </span><br><span class="line">+-----------------------------------------------------------------------+         </span><br><span class="line">| -&gt; Table scan on t1  (cost=0.35 rows=1) (actual time=0.042..0.048 rows=1 loops=1)                                                                      |         </span><br><span class="line">+-----------------------------------------------------------------------+                                                                       </span><br><span class="line">1 row in set (0.00 sec)                                                                                                </span><br></pre></td></tr></table></figure>
-
-
-
-<p>这里的(actual time&#x3D;0.042..0.048 rows&#x3D;1 loops&#x3D;1)，表示实际执行时间和行数。actual time 显示了执行这个步骤的时间范围，rows 显示实际扫描的行数，loops 显示执行这个步骤的次数。</p>
-]]></content>
-      <categories>
-        <category>MySql</category>
-      </categories>
   </entry>
   <entry>
     <title>解决hexo + Typora 图片上传问题</title>
